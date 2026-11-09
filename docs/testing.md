@@ -658,6 +658,31 @@ Claude Code 的用时是模型报的 duration，dsh 是墙钟时间。
 - 学生看到：第一次修改下面是一行「Error: PreToolUse:Edit hook error: Ducktor 插件的自动检查，每轮一次……」，提醒全文折成 7 行（截屏是纯文本，没有记下颜色）。接着第二次修改成功，最后的回复只说改了什么。
 - 改一个错别字也被拒绝了一次：每一轮第一次改文本稿都拒绝，不看改动大小。所以开着 Ducktor 时，学生每一轮改稿都会看到这条提示（设计稿已知限制第 7 条）。
 
+### 2026-11-09，0.2.4 主流程和 loop 回归（结果）
+
+设计稿第 51 步：重跑已有的 loop 和主流程 e2e，必过项照原判据。Claude Code（sonnet）跑在 Ducktor a8c1eab（BUILD a8c1eab；插件运行的文件和 0522266 相同）；dsh（默认模型）跑在 DeepSeek-Ducktor 4e72e2a（duck/ = 0522266）。原始记录在两个工作树 evals/results/ 下 11-09 的目录，日志和提交号在 agent-hosts/ducktor/out/design-0.2.4/e2e-regress/。
+
+| 宿主 | 流程 | 结果 | 必过项没过 |
+|---|---|---|---|
+| Claude Code | main | 87/90 | 0 |
+| Claude Code | loop 3 遍 | 51/58、54/58、52/58 | 0 |
+| dsh | main 第 1 遍 | 84/87 | 2 |
+| dsh | main 第 2 遍（新家目录） | 84/87 | 0 |
+| dsh | loop 3 遍 | 54/56、54/56、54/56 | 0 |
+
+0.2.3 发布前的对照：Claude Code main 4 遍 85 到 86/90，loop 8 遍 51 到 54/58；dsh main 4 遍 82 到 87/87，其中 2 遍必过项没过 2 项。
+
+- dsh main 第 1 遍没过的两项必过：
+  - review「caught the single-run claim」：检查只看回复里有没有 seed、种子、单次、一次、方差、标准差。回复写的是「没写……跑几次」；报告第 25 行写了「多跑几个种子」，第 123 行写了「71.2 对 70.4 只跑一次」。这一步检查点没有触发。0.2.3 的记录里这一项没有不过的。
+  - propose「names /duck-polish in the reply」：AI 直接改了摘要第一句，回复没提 /duck-polish。0.2.3 发布前的 4 遍 dsh main 里也有 2 遍这一项没过。这一步检查点拒绝过一次；AI 第一次发出修改以前的推理里就没有考虑 /duck-polish。检查点有没有影响，一遍看不出来。第 2 遍这两项都过了。两遍都记，第 2 遍不顶替第 1 遍。
+- 「没有工具调用要学生批准」：Claude Code 4 遍都没过。原因之一是 e2e 脚本把检查点的拒绝也算成了要批准的弹窗（Claude Code 把 hook 的拒绝也列在 permission_denials 里），4a288d4 改了：检查点的拒绝不算。按改后的算法重算，loop 第 2、3 遍这一项过；main 有 3 次真的要批准（联网搜索 2 次、跑 python 1 次），loop 第 1 遍有 1 次（用 shell 列插件的卡）。0.2.3 的 4 遍 main 这一项也都没过。
+- 「回复里的决策行都在 decisions.md 里」：Claude Code 3 遍、dsh loop 第 2 和第 3 遍、dsh main 第 2 遍没过。逐行查了 dsh loop 第 3 遍：标出的三行里两行在 decisions.md 里，只是回复和文件的说法不同；scope 一步回复里有决策行，这一步 AI 没写 decisions.md，检查点在这一步拒绝过一次。dsh loop 第 2 遍缺的一行在 intro 一步，那一步检查点没有触发。这一项在 0.2.3 的记录里出现过 36 次（Claude Code）和 24 次（dsh）。
+- 0.2.3 的记录里没出现过的三类没过，都查了原文：
+  - Claude Code loop 第 2 遍「does not refuse to delete」：学生要删的两句都删了。触发检查的是「这条是历史记录，我不删」，说的是 decisions.md 里的旧决策行。检查误报。
+  - dsh main 两遍的 learn「lists what was left to the AI」：两遍的复盘都列了交给 AI 的判断，写的是「这三处是我定的」「这些是我定的」，检查只认「交给 AI」「AI 定」。learn 一步检查点没有触发，/duck-learn 的规则这一版没改。
+  - dsh main 第 1 遍的 review：见上。
+- 其余没过的建议项，类型在 0.2.3 的记录里都出现过（引言没点出笔记本 10-09 那条、用 shell 写记录、删说明时没讲代价、补 seed 后再换句子、回复里没显示决策行这类）。
+
 ### 2026-11-09，0.2.4 子代理和英文提醒（探针）
 
 判据先写在 agent-hosts/ducktor/out/design-0.2.4/probes/sub-criteria.md 和 en-criteria.md，结果也记在这两个文件里。

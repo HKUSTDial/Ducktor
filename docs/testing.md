@@ -495,6 +495,23 @@ rc12 的结果（Ducktor 8786f36，DeepSeek-Ducktor ae30950），最终版：
 6. 记录：checkpoint/ 落在哪个位置（`CLAUDE_PLUGIN_DATA` 下还是后备位置）。另一个位置靠单元测试 `checkpoint falls back to XDG_STATE_HOME without CLAUDE_PLUGIN_DATA` 覆盖。
 7. 探针 A 的三项必过有一项不过：先查原因，不往下跑 e2e。
 
+### 2026-11-09，0.2.4 探针（结果）
+
+原始记录在 agent-hosts/ducktor/out/design-0.2.4/probes/（每个探针一个目录：turn.jsonl、summary.txt、project-final/；dsh 的 log.txt 在目录里，Claude Code 的在 ~/.claude/plugins/data/duck-inline/checkpoint/log.txt，按会话 id 筛）。时间是日志里的 UTC。
+
+| 探针 | 提交 | 结果 |
+|---|---|---|
+| Claude Code A（开关 on，扩写研究设计） | 584ab73 | 三项必过都过：第一次 Edit 被拒绝，工具结果里有提醒全文；同一轮第二次 Edit 成功；日志一行 deny、之后 allow，build 等于 BUILD。只记录：回复里没有提检查。AI 照原稿留了逐步回归，三处没定的（调节路径、筛选条件、量表）标【待定】并编号列给学生，Bootstrap 等只列为建议。 |
+| Claude Code B（两个文件一起改「在校大学生」） | 584ab73 | 无效：样本说法是研究决定，AI 先问了学生，一处都没改，日志没有这个会话的行。两个文件一起改的情况没测到。 |
+| Claude Code B2（两个文件各加一行草稿日期） | 584ab73 | 同一批两次 Edit：plan.md 拒绝，abstract.md 0.8 秒后放行（设计稿已知限制第 2 条）；AI 随后重发 plan.md。问题：两次工具调用之间，AI 写了一句学生看得到的英文「The edit only adds a draft-date line; no research decisions. Retry.」。提醒在 3c20440 改为「回复里和工具调用之间都不写关于这次检查的话」。 |
+| Claude Code B3，3 遍（同 B2） | 3c20440 | 3 遍都是：拒绝、放行（另一个文件）、放行（重发）；工具调用之间没有文字，最后的回复没有提检查。 |
+| Claude Code C（开关 off） | 584ab73 | 必过：日志里这个会话只有一行 allow，会话记录里没有提醒。 |
+| dsh A（同 Claude Code A） | DeepSeek-Ducktor ca18d03（duck/ = 584ab73） | 必过三项都过：第一次 write 被拒绝，会话里有提醒全文；同一轮之后的 write 成功；日志的 build 等于 DeepSeek-Ducktor 的 HEAD，duck 等于 584ab73。被拒的是整份 write，30 秒后重写（已知限制第 5 条）。AI 照原稿留了逐步回归，三处没定的编号列给学生。用的是 3c20440 之前的提醒。 |
+
+- checkpoint/ 的位置：Claude Code 用 `--plugin-dir` 时落在 `~/.claude/plugins/data/duck-inline/checkpoint/`（`CLAUDE_PLUGIN_DATA` 分支）。后备分支由单元测试 `checkpoint without CLAUDE_PLUGIN_DATA writes under XDG_STATE_HOME` 覆盖，没有用真宿主跑过。
+- Claude Code 把拒绝写进工具结果时，前面加了「PreToolUse:Edit hook error:」。提醒里写了「也不是工具出错」；这几遍里 AI 没有把它讲成报错。
+- Codex 探针还没跑：要先照设计稿「要你定的」第 7 条准备单独的 CODEX_HOME，登录信息由用户复制。
+
 ### 更早的结果
 
 

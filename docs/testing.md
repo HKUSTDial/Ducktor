@@ -658,6 +658,19 @@ Claude Code 的用时是模型报的 duration，dsh 是墙钟时间。
 - 学生看到：第一次修改下面是一行「Error: PreToolUse:Edit hook error: Ducktor 插件的自动检查，每轮一次……」，提醒全文折成 7 行（截屏是纯文本，没有记下颜色）。接着第二次修改成功，最后的回复只说改了什么。
 - 改一个错别字也被拒绝了一次：每一轮第一次改文本稿都拒绝，不看改动大小。所以开着 Ducktor 时，学生每一轮改稿都会看到这条提示（设计稿已知限制第 7 条）。
 
+### 2026-11-09，0.2.4 子代理和英文提醒（探针）
+
+判据先写在 agent-hosts/ducktor/out/design-0.2.4/probes/sub-criteria.md 和 en-criteria.md，结果也记在这两个文件里。
+
+| 探针 | 提交 | 结果 |
+|---|---|---|
+| 子代理，Claude Code（sonnet） | 5ce238c | 通过：子代理改 notes.md 是 allow、标 subagent: true；主对话第一次改 plan.md 是 deny，之后 allow。两处最后都在文件里，回复没提检查。 |
+| 子代理，dsh | DeepSeek-Ducktor f84a208（duck/ = 5ce238c） | 通过：同上。 |
+| 英文提醒，Claude Code（sonnet，config 写「Switch: on」） | e320200（BUILD 37bed43） | 三项必过都过：第一次 Write plan.md 被拒绝，工具结果有 English 一节全文；之后的 Write 成功；日志 deny、allow，build 37bed43。只记录：回复全是英文，没提检查；调节路径照原稿留着，三个问题编号放在引用块之后；编号列表后面还有一句「you could run /duck-review」。 |
+| 英文提醒，dsh | DeepSeek-Ducktor 4e72e2a（duck/ = 0522266） | 三项必过都过（同上）。只记录：回复全是英文，没提检查；调节写成「at the path or paths chosen in the open decision below」，三种选择并列标明没定；三个问题编号放在最后，后面没有别的。 |
+
+子代理探针跑在第一个候选上，之后没有重跑。之后改的是整批拦下和提醒的文字：子代理的修改在 checkpointDecision 里直接放行，整批判断只看判成要拒绝的修改（bin/duck.js；DeepSeek-Ducktor 的 lib/checkpoint.js 调同一个函数）。
+
 ### 2026-11-09，0.2.4 的 Codex
 
 设计稿第 6 个选择（用户 11-09 定）：Codex 探针全部通过，才在 Codex 里打开检查点。Codex 探针还没跑（要单独的 CODEX_HOME，登录信息由用户复制）。37bed43 起，Codex 的 apply_patch 只在环境变量 `DUCK_CODEX_CHECKPOINT=1` 时进检查点，探针和单元测试用它打开。默认不进，Codex 里的行为和 0.2.3 一样。INSTALL.md 讲 Codex 第二条 hook 的那句改回 0.2.3 的说法。

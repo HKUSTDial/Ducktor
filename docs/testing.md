@@ -655,7 +655,7 @@ Claude Code 的用时是模型报的 duration，dsh 是墙钟时间。
 
 在 Claude Code 交互界面（v2.1.319，Sonnet）里跑一遍：开关 on，学生让 AI 改 notes.md 里的一个错别字。截屏在 agent-hosts/ducktor/out/design-0.2.4/probes/tui-2/03-scrollback.txt（tui-1 是没跑成的一次：信任目录的对话框没选对）。
 
-- 学生看到：第一次修改下面是一条红色的「Error: PreToolUse:Edit hook error: Ducktor 插件的自动检查，每轮一次……」，提醒全文折成 7 行。接着第二次修改成功，最后的回复只说改了什么。
+- 学生看到：第一次修改下面是一行「Error: PreToolUse:Edit hook error: Ducktor 插件的自动检查，每轮一次……」，提醒全文折成 7 行（截屏是纯文本，没有记下颜色）。接着第二次修改成功，最后的回复只说改了什么。
 - 改一个错别字也被拒绝了一次：每一轮第一次改文本稿都拒绝，不看改动大小。所以开着 Ducktor 时，学生每一轮改稿都会看到这条提示（设计稿已知限制第 7 条）。
 
 ### 2026-11-09，0.2.4 的 Codex

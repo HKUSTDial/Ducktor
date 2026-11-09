@@ -588,6 +588,7 @@ test('checkpoint: a log that cannot be opened does not change the decision', () 
   assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data).permissionDecision, 'deny');
 });
 
+// O_EXCL already refuses an existing name, link or not; this checks the link target is not created.
 test('checkpoint: a symlinked turn record is not followed; pruning keeps LOG', () => {
   const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
   const data = project();
@@ -611,4 +612,54 @@ test('checkpoint falls back to XDG_STATE_HOME without CLAUDE_PLUGIN_DATA', () =>
   assert.equal(duck.checkpointDir({ XDG_STATE_HOME: '/x/state' }), path.join('/x/state', 'ducktor', 'checkpoint'));
   assert.equal(duck.checkpointDir({ HOME: '/h' }), path.join('/h', '.local', 'state', 'ducktor', 'checkpoint'));
   assert.equal(duck.checkpointDir({ CLAUDE_PLUGIN_DATA: '/d', XDG_STATE_HOME: '/x' }), path.join('/d', 'checkpoint'));
+});
+
+test('checkpoint: a shared or foreign checkpoint folder lets every edit through', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const data = project();
+  const cp = path.join(data, 'checkpoint');
+  fs.mkdirSync(cp);
+  fs.chmodSync(cp, 0o777);
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data), null);
+});
+
+test('checkpoint: log.txt as a link is not followed', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const data = project();
+  const cp = path.join(data, 'checkpoint');
+  fs.mkdirSync(cp, { mode: 0o700 });
+  fs.writeFileSync(path.join(cp, 'LOG'), '');
+  const victim = path.join(data, 'victim.txt');
+  fs.writeFileSync(victim, '');
+  fs.symlinkSync(victim, path.join(cp, 'log.txt'));
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data).permissionDecision, 'deny');
+  assert.equal(fs.readFileSync(victim, 'utf8'), '');
+});
+
+test('checkpoint without CLAUDE_PLUGIN_DATA writes under XDG_STATE_HOME', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const state = project();
+  const run = runHook('PreToolUse', { CLAUDE_PLUGIN_ROOT: ROOT, XDG_STATE_HOME: state }, JSON.stringify(editInput(dir, path.join(dir, 'plan.md'))));
+  assert.equal(JSON.parse(run.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  assert.ok(fs.existsSync(path.join(state, 'ducktor', 'checkpoint', 's1--p1')));
+});
+
+test('checkpoint: ids holding "--" are let through, so record names cannot collide', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md'), { session_id: 'a--b' }), project()), null);
+});
+
+test('checkpoint: Codex relative paths resolve against cwd; session start prunes', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'docs/plan.md': 'a' });
+  const data = project();
+  const out = checkpointRun({ tool_name: 'apply_patch', cwd: path.join(dir, 'docs'), session_id: 's', turn_id: 't', tool_input: { command: '*** Begin Patch\n*** Update File: plan.md\n*** End Patch' } }, data, { CLAUDE_PROJECT_DIR: dir });
+  assert.equal(out.permissionDecision, 'deny');
+  const cp = path.join(data, 'checkpoint');
+  const old = path.join(cp, 'old--x');
+  fs.writeFileSync(old, '');
+  const past = (Date.now() - 8 * 24 * 3600 * 1000) / 1000;
+  fs.utimesSync(old, past, past);
+  runHook('SessionStart', { CLAUDE_PLUGIN_ROOT: ROOT, CLAUDE_PLUGIN_DATA: data }, JSON.stringify({ cwd: dir }));
+  assert.equal(fs.existsSync(old), false);
+  assert.ok(fs.existsSync(path.join(cp, 's--t')));
 });

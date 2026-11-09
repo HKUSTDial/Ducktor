@@ -359,7 +359,9 @@ function allowRecord(input) {
 // (design: agent-hosts/ducktor/out/design-0.2.4/DESIGN.md). Every doubt lets the edit through.
 
 const TEXT_DRAFT = new Set(['.md', '.tex', '.txt', '.rst', '.typ', '.org', '.qmd', '.rmd']);
-const SAFE_ID = /^[\w.-]{1,128}$/;
+// Session and turn ids go into a file name joined by "--", so an id may not hold "--" itself.
+// Without a usable session id the turn cannot be told apart from other sessions: let through.
+const SAFE_ID = /^(?!.*--)[\w.-]{1,128}$/;
 const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit'];
 
 // Paths an apply_patch command touches: Update, Add and Delete lines, and the new path of a move.
@@ -409,6 +411,9 @@ function checkpointDir(env = process.env) {
 function claimTurn(dir, key) {
   try {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // A folder another user made, or one others can write to, could be used to fake records.
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) return false;
     const c = fs.constants;
     fs.closeSync(fs.openSync(path.join(dir, key), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600));
     return true;
@@ -435,14 +440,16 @@ function writeCheckpointLog(dir, entry, root = ROOT) {
 
 // Removes turn records older than seven days. LOG and log.txt stay.
 function pruneCheckpoint(dir, now = Date.now()) {
-  try {
-    for (const name of fs.readdirSync(dir)) {
-      if (name === 'LOG' || name === 'log.txt') continue;
+  let names;
+  try { names = fs.readdirSync(dir); } catch (err) { return; }
+  for (const name of names) {
+    if (name === 'LOG' || name === 'log.txt') continue;
+    try {
       const file = path.join(dir, name);
       const stat = fs.lstatSync(file);
       if (stat.isFile() && now - stat.mtimeMs > 7 * 24 * 3600 * 1000) fs.unlinkSync(file);
-    }
-  } catch (err) { /* nothing to prune */ }
+    } catch (err) { /* another session removed it, or it is not ours: skip */ }
+  }
 }
 
 // The reminder from rules/checkpoint.md: the English section when the config is in English;
@@ -460,9 +467,12 @@ function checkpointReminder(config, root = ROOT) {
 function checkpoint(input) {
   const toolInput = input.tool_input || {};
   const project = [process.env.CLAUDE_PROJECT_DIR, input.cwd].find((p) => typeof p === 'string' && p);
-  if (!project) return false;
-  const config = readText(path.join(project, '.duck', 'config.md'));
   const host = input.tool_name === 'apply_patch' ? 'codex' : 'claude-code';
+  if (!project) {
+    writeCheckpointLog(checkpointDir(), { host, session: String(input.session_id || ''), turn: '', tool: input.tool_name, subagent: false, decision: 'allow' });
+    return false;
+  }
+  const config = readText(path.join(project, '.duck', 'config.md'));
   const files = input.tool_name === 'apply_patch' ? patchPaths(toolInput.command) : [toolInput.file_path];
   const facts = {
     mode: modeOf(config).mode,
@@ -495,7 +505,10 @@ function main(command) {
     try {
       const input = readInput();
       if (EDIT_TOOLS.includes(input.tool_name)) {
-        if (!checkpoint(input)) allowRecord(input);
+        // A checkpoint that throws refuses nothing: the record rules still apply.
+        let refused = false;
+        try { refused = checkpoint(input); } catch (err) { refused = false; }
+        if (!refused) allowRecord(input);
       } else if (input.tool_name === 'apply_patch') checkpoint(input);
       else if (input.tool_name === 'Bash') refuseShellLogWrite(input);
       else allowRead(input);

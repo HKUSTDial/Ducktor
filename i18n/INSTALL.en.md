@@ -29,7 +29,7 @@ codex plugin marketplace add yinwu01/Ducktor
 codex plugin add duck@ducktor
 ```
 
-Then open Codex. In `/hooks`, trust the two Ducktor hooks. The first hook loads the rules when a session starts. The second hook is for Claude Code: it lets Claude Code read the files of the plugin and write the notebook. Codex does not need it. Then type `$duck:duck` to see the menu.
+Then open Codex. In `/hooks`, trust the two Ducktor hooks. The first hook loads the rules when a session starts. The second hook runs before a file is changed. In a project with Ducktor on, it reminds the AI once per turn, at the first edit of a text draft. It also lets Claude Code read the files of the plugin and write the notebook. Then type `$duck:duck` to see the menu.
 
 - **Update**: `codex plugin marketplace upgrade ducktor`, then `codex plugin add duck@ducktor`. If a hook changed, trust it again in `/hooks`. Version 0.2.0 changed the commands of the two hooks. After you update to 0.2.0, trust the two hooks again.
 - **Remove**: `codex plugin remove duck@ducktor` and `codex plugin marketplace remove ducktor`.

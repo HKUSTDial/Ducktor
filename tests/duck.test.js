@@ -663,3 +663,60 @@ test('checkpoint: Codex relative paths resolve against cwd; session start prunes
   assert.equal(fs.existsSync(old), false);
   assert.ok(fs.existsSync(path.join(cp, 's--t')));
 });
+
+test('checkpoint refuses the rest of the first batch until the transcript holds the refused call', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n', 'abstract.md': 'a\n' });
+  const data = project();
+  const transcript = path.join(project(), 'session.jsonl');
+  fs.writeFileSync(transcript, '{"type":"user"}\n');
+  const call = (id, file) => checkpointRun(editInput(dir, path.join(dir, file), { tool_use_id: id, transcript_path: transcript }), data);
+  assert.equal(call('toolu_A', 'plan.md').permissionDecision, 'deny');
+  // Sent in the same message: the transcript does not hold toolu_A yet.
+  const batch = call('toolu_B', 'abstract.md');
+  assert.equal(batch.permissionDecision, 'deny');
+  assert.match(batch.permissionDecisionReason, /这不是学生的拒绝/);
+  // The model has read the refusals: the transcript now holds toolu_A, so its edits go through.
+  fs.appendFileSync(transcript, '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_A"}]}}\n');
+  assert.equal(call('toolu_C', 'plan.md'), null);
+  assert.equal(call('toolu_D', 'abstract.md'), null);
+});
+
+test('batch refusals stop without a usable transcript, after eight, and after two minutes', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const transcript = path.join(project(), 'session.jsonl');
+  fs.writeFileSync(transcript, '');
+  const run = (data, extra) => checkpointRun(editInput(dir, path.join(dir, 'plan.md'), extra), data);
+  // No transcript, a relative path, or no call id: only the first edit is refused.
+  for (const extra of [{}, { transcript_path: 'session.jsonl' }, { transcript_path: transcript, tool_use_id: undefined }]) {
+    const data = project();
+    assert.equal(run(data, { tool_use_id: 'toolu_1', transcript_path: transcript }).permissionDecision, 'deny');
+    assert.equal(run(data, { tool_use_id: 'toolu_2', ...extra }), null);
+  }
+  // Eight batch refusals at most.
+  const data = project();
+  assert.equal(run(data, { tool_use_id: 'toolu_0', transcript_path: transcript }).permissionDecision, 'deny');
+  for (let i = 1; i <= 8; i += 1) assert.equal(run(data, { tool_use_id: `toolu_${i}`, transcript_path: transcript }).permissionDecision, 'deny');
+  assert.equal(run(data, { tool_use_id: 'toolu_9', transcript_path: transcript }), null);
+  // Two minutes after the first refusal the batch is over.
+  const cp = path.join(project(), 'checkpoint');
+  fs.mkdirSync(cp, { mode: 0o700 });
+  const t = Date.now();
+  fs.writeFileSync(path.join(cp, 's--p'), JSON.stringify({ first: 'toolu_A', t }), { mode: 0o600 });
+  const input = { tool_use_id: 'toolu_B', transcript_path: transcript };
+  assert.equal(duck.sameBatch(cp, 's--p', input, t + 119 * 1000), true);
+  assert.equal(duck.sameBatch(cp, 's--p', { ...input, tool_use_id: 'toolu_C' }, t + 121 * 1000), false);
+  // A record without a call id, or a broken one, refuses nothing more.
+  fs.writeFileSync(path.join(cp, 's--q'), JSON.stringify({ first: '', t }), { mode: 0o600 });
+  assert.equal(duck.sameBatch(cp, 's--q', input, t), false);
+  fs.writeFileSync(path.join(cp, 's--r'), 'not json', { mode: 0o600 });
+  assert.equal(duck.sameBatch(cp, 's--r', input, t), false);
+});
+
+test('claimTurn says whether it created the record, found it, or failed', () => {
+  const cp = path.join(project(), 'checkpoint');
+  assert.equal(duck.claimTurn(cp, 's--p', '{"first":"toolu_A"}'), 'created');
+  assert.equal(fs.readFileSync(path.join(cp, 's--p'), 'utf8'), '{"first":"toolu_A"}');
+  assert.equal(duck.claimTurn(cp, 's--p', 'x'), 'exists');
+  fs.chmodSync(cp, 0o755);
+  assert.equal(duck.claimTurn(cp, 's--q'), 'error');
+});

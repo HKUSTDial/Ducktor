@@ -356,7 +356,9 @@ function allowRecord(input) {
 // research decisions stay as the draft has them and are listed for the student. On 11-05 the
 // model wrote such decisions into the draft before asking in 4 of 5 re-tests, although
 // rules/core.md says to list them; a reminder at the moment of editing is the remedy chosen
-// (design: agent-hosts/ducktor/out/design-0.2.4/DESIGN.md). Every doubt lets the edit through.
+// (design: agent-hosts/ducktor/out/design-0.2.4/DESIGN.md). The other text-draft edits sent in
+// the same batch are refused too, so none lands before the reminder is read (sameBatch below;
+// the 11-09 e2e found the batch edits writing the decision). Every doubt lets the edit through.
 
 const TEXT_DRAFT = new Set(['.md', '.tex', '.txt', '.rst', '.typ', '.org', '.qmd', '.rmd']);
 // Session and turn ids go into a file name joined by "--", so an id may not hold "--" itself.
@@ -406,16 +408,75 @@ function checkpointDir(env = process.env) {
   return path.join(state, 'ducktor', 'checkpoint');
 }
 
-// Creates this turn's record. True only when this call created it; false when it exists or
-// anything fails (the edit is then let through).
-function claimTurn(dir, key) {
+// Creates this turn's record with the given content. 'created' when this call created it,
+// 'exists' when an earlier call of the turn did, 'error' when anything else fails (the edit is
+// then let through).
+function claimTurn(dir, key, content = '') {
   try {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     // A folder another user made, or one others can write to, could be used to fake records.
     const stat = fs.lstatSync(dir);
-    if (!stat.isDirectory() || (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) return false;
+    if (!stat.isDirectory() || (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) return 'error';
     const c = fs.constants;
-    fs.closeSync(fs.openSync(path.join(dir, key), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600));
+    let fd;
+    try {
+      fd = fs.openSync(path.join(dir, key), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600);
+    } catch (err) {
+      return err && err.code === 'EEXIST' ? 'exists' : 'error';
+    }
+    try { fs.writeSync(fd, content); } finally { fs.closeSync(fd); }
+    return 'created';
+  } catch (err) {
+    return 'error';
+  }
+}
+
+// Claude Code sends several edits in one message and runs them one after another before the
+// model reads any result, so the edits sent with the refused one would land before the reminder
+// is read. Its transcript gets the refused call only after the whole batch has run (probe of
+// 11-09), so an edit of the same turn that comes while the transcript does not hold the refused
+// call yet belongs to that batch and is refused too. Two limits keep a host that writes its
+// transcript differently from refusing a whole turn: two minutes after the first refusal, and
+// eight refusals per turn. Anything unexpected lets the edit through.
+const BATCH_MS = 120 * 1000;
+const BATCH_MAX = 8;
+const CALL_ID = /^[\w-]{1,128}$/;
+
+// The last max bytes of a file as text, or null when it cannot be read.
+function readTail(file, max) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, max);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    return buf.toString('utf8');
+  } catch (err) {
+    return null;
+  } finally {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch (err) { /* closed */ }
+  }
+}
+
+// True when this edit belongs to the batch of the turn's first refused edit (see above).
+function sameBatch(dir, key, input, now = Date.now()) {
+  try {
+    const c = fs.constants;
+    const fd = fs.openSync(path.join(dir, key), c.O_RDONLY | c.O_NOFOLLOW);
+    let rec;
+    try { rec = JSON.parse(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); }
+    const first = rec && typeof rec.first === 'string' && CALL_ID.test(rec.first) ? rec.first : '';
+    if (!first || typeof rec.t !== 'number' || now < rec.t || now - rec.t > BATCH_MS) return false;
+    if (typeof input.tool_use_id !== 'string' || !CALL_ID.test(input.tool_use_id) || input.tool_use_id === first) return false;
+    const transcript = input.transcript_path;
+    if (typeof transcript !== 'string' || !path.isAbsolute(transcript)) return false;
+    const text = readTail(transcript, 8 * 1024 * 1024);
+    if (text === null || text.includes(first)) return false;
+    // One marker file per refusal of the batch, so the count survives across hook processes.
+    const prefix = `${key}.b`;
+    if (fs.readdirSync(dir).filter((n) => n.startsWith(prefix)).length >= BATCH_MAX) return false;
+    fs.closeSync(fs.openSync(path.join(dir, `${prefix}${input.tool_use_id}`), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600));
     return true;
   } catch (err) {
     return false;
@@ -486,8 +547,16 @@ function checkpoint(input) {
   const dir = checkpointDir();
   const reminder = checkpointReminder(config);
   let decision = reminder ? checkpointDecision(facts) : 'allow';
-  if (decision === 'claim') decision = claimTurn(dir, `${facts.session}--${facts.turn}`) ? 'deny' : 'allow';
-  writeCheckpointLog(dir, { host, session: String(facts.session || ''), turn: String(facts.turn || ''), tool: input.tool_name, subagent: facts.isSubagent, decision });
+  let batch = false;
+  if (decision === 'claim') {
+    const key = `${facts.session}--${facts.turn}`;
+    const first = typeof input.tool_use_id === 'string' && CALL_ID.test(input.tool_use_id) ? input.tool_use_id : '';
+    const claim = claimTurn(dir, key, JSON.stringify({ first, t: Date.now() }));
+    if (claim === 'created') decision = 'deny';
+    else if (claim === 'exists' && sameBatch(dir, key, input)) { decision = 'deny'; batch = true; }
+    else decision = 'allow';
+  }
+  writeCheckpointLog(dir, { host, session: String(facts.session || ''), turn: String(facts.turn || ''), tool: input.tool_name, subagent: facts.isSubagent, decision, batch });
   if (decision !== 'deny') return false;
   fs.writeSync(1, JSON.stringify({
     hookSpecificOutput: {
@@ -537,7 +606,7 @@ function main(command) {
 module.exports = {
   main, modeOf, buildContext, insideRoot, ROOT,
   // Edit checkpoint, also used by DeepSeek-Ducktor.
-  patchPaths, isTextDraft, checkpointDecision, checkpointDir, claimTurn, writeCheckpointLog, pruneCheckpoint, checkpointReminder,
+  patchPaths, isTextDraft, checkpointDecision, checkpointDir, claimTurn, sameBatch, writeCheckpointLog, pruneCheckpoint, checkpointReminder,
 };
 
 if (require.main === module) main(process.argv[2]);

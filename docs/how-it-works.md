@@ -6,7 +6,7 @@
 
 ```
 .claude-plugin/  .codex-plugin/  .cursor-plugin/  .agents/plugins/  gemini-extension.json   各宿主的清单
-hooks/  bin/duck.js     开场注入、读插件文件和追加记录的放行（Node，不装依赖）
+hooks/  bin/duck.js     开场注入、读插件文件和追加记录的放行、改稿前的检查（Node，不装依赖）
 rules/                  常驻规则、命令模板、命令表
 skills/                 14 条命令
 library/                Supervisor-Skills 的 10 个原技能（上游提交 aff5de9），原样存放
@@ -71,6 +71,21 @@ Claude Code 默认不让读工作目录以外的文件：交互时每次弹窗�
 这条 hook 只跳过「要不要允许」的询问；据 Claude Code 的权限文档，用户自己设的 deny、ask 规则照样生效。用户开了 `blockReadsOutsideWorkingDirectories` 时它还管不管用，文档没写，我们也没测。
 
 Codex 的沙箱默认能读整个文件系统，不需要这条；它的工具名也不叫 Read，这条 hook 在 Codex 里匹配不到任何东西。
+
+## 改稿前的检查（0.2.4 起）
+
+开关是 on 或 quiet 时，同一个 PreToolUse hook 还做一件事：每一轮 AI 第一次修改文本稿时，回答 deny，理由是 `rules/checkpoint.md` 的中文一节（config.md 的开关行写成「Switch:」时用 English 一节）。AI 在工具结果里读到这段提醒，再重新发起修改。起因：常驻规则写了「没定的研究决定照原稿写」，0.2.3 的角色复测里模型读到了，改稿时还是会替学生定。提醒放在改稿的那一刻，离要做的事最近。
+
+- 文本稿：扩展名是 .md、.tex、.txt、.rst、.typ、.org、.qmd、.Rmd，路径解开符号链接以后在项目目录下，不在 `.duck/` 下。改代码、改 `.duck/` 的记录不拦。项目目录的认法和放行一样。
+- 一轮：Claude Code 按 hook 输入里的 `prompt_id` 认，Codex 按 `turn_id` 认。子代理的修改（hook 输入里有 `agent_id`）不拦，也不用掉这一轮的那次拒绝。会话 id 或这一轮的 id 里有 `--` 或别的字符时放行。
+- 记录：第一次拒绝时，在 `$CLAUDE_PLUGIN_DATA/checkpoint/` 下用 O_EXCL、O_NOFOLLOW 建一个以「会话 id--这一轮的 id」命名的文件（宿主没给 `CLAUDE_PLUGIN_DATA` 时用 `$XDG_STATE_HOME/ducktor/checkpoint/`，再没有就用 `~/.local/state/ducktor/checkpoint/`）。文件已经在，这一轮不再拒绝。目录不归当前用户，或者同组和其他用户对它有任何权限时，放行。开新会话时删掉 7 天前的记录。
+- 同一批：Claude Code 一条消息里可以发出几处修改，它们执行时 AI 还没读到第一次拒绝的提醒（11-09 的探针：这一批跑完以后，会话记录里才有被拒的那次调用）。所以第一次拒绝以后，会话记录（hook 输入里的 `transcript_path`，读最后 8 MB）里还没有被拒那次调用的 id 时，这一轮的文本稿修改也拒绝一次。第一处以外最多再拒 8 处；第一次拒绝 2 分钟以后，不再算同一批。
+- 出错就放行：读不到 config、建不了记录、会话记录读不了，这一次都放行，hook 不输出任何东西。
+- Codex：`apply_patch` 只在环境变量 `DUCK_CODEX_CHECKPOINT=1` 时进检查，探针和单元测试用它打开。0.2.4 的设计要 Codex 探针全部通过才打开；hooks 文件的匹配里现在也没有 `apply_patch`。
+- 测试日志：`checkpoint/` 下有一个叫 `LOG` 的文件时，每次判断在 `log.txt` 里记一行（宿主、会话、这一轮、工具、是不是子代理、deny 或 allow、是不是同一批、时间、插件根目录下 BUILD 文件的内容）。平时没有 `LOG`，不记。
+- DeepSeek-Ducktor 在 dsh 执行改稿工具以前做同样的判断，调同一份 `bin/duck.js` 里的函数和提醒；同一批按 dsh 的「步」认，记录放在内存里。
+
+各宿主的探针、端到端测试和已知问题在 `docs/testing.md`「0.2.4」几节和 CHANGELOG 0.2.4 一节。
 
 ## 学生项目里的 `.duck/`
 

@@ -480,3 +480,135 @@ test('hooks with a bin/duck.js that loads but has no main: a note at session sta
   assert.equal(pre.stdout, '');
   assert.equal(pre.stderr, '');
 });
+
+// ---------------------------------------------------------------------------------------
+// Edit checkpoint (0.2.4). Each run gets its own CLAUDE_PLUGIN_DATA, so nothing lands in ~.
+
+function checkpointRun(input, dataDir, env = {}) {
+  const run = runHook('PreToolUse', { CLAUDE_PLUGIN_ROOT: ROOT, CLAUDE_PLUGIN_DATA: dataDir, ...env }, JSON.stringify(input));
+  return run.stdout ? JSON.parse(run.stdout).hookSpecificOutput : null;
+}
+
+function editInput(dir, file, extra = {}) {
+  return { tool_name: 'Edit', cwd: dir, session_id: 's1', prompt_id: 'p1', tool_input: { file_path: file, old_string: 'a', new_string: 'b' }, ...extra };
+}
+
+test('checkpoint refuses the first edit of a text draft in a turn, once', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n', 'abstract.md': 'a\n' });
+  const data = project();
+  const first = checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data);
+  assert.equal(first.permissionDecision, 'deny');
+  assert.match(first.permissionDecisionReason, /这不是学生的拒绝/);
+  // Same turn: let through, also for another draft.
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data), null);
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'abstract.md')), data), null);
+  // Next turn: refused once again.
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md'), { prompt_id: 'p2' }), data).permissionDecision, 'deny');
+  // Another session, same prompt id: its own turn.
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md'), { session_id: 's2' }), data).permissionDecision, 'deny');
+});
+
+test('checkpoint lets an edit through in every case the design lists', () => {
+  const on = project({ '.duck/config.md': '开关：quiet\n', 'a.md': 'a', 'code.py': 'a', '.duck/notebook.md': '- x\n' });
+  const data = () => project();
+  const deny = (input) => (checkpointRun(input, data()) || {}).permissionDecision === 'deny';
+  // quiet counts as on.
+  assert.equal(deny(editInput(on, path.join(on, 'a.md'))), true);
+  // off, unset, no config.
+  for (const config of ['开关：off\n', '# 设定\n']) {
+    const p = project({ '.duck/config.md': config, 'a.md': 'a' });
+    assert.equal(deny(editInput(p, path.join(p, 'a.md'))), false);
+  }
+  const bare = project({ 'a.md': 'a' });
+  assert.equal(deny(editInput(bare, path.join(bare, 'a.md'))), false);
+  // Subagent, no turn id, an unsafe id.
+  assert.equal(deny(editInput(on, path.join(on, 'a.md'), { agent_id: 'sub-1' })), false);
+  assert.equal(deny(editInput(on, path.join(on, 'a.md'), { prompt_id: undefined })), false);
+  assert.equal(deny(editInput(on, path.join(on, 'a.md'), { prompt_id: '../x' })), false);
+  // Not a text draft: code, .duck/, outside the project.
+  assert.equal(deny(editInput(on, path.join(on, 'code.py'))), false);
+  assert.equal(deny(editInput(on, path.join(on, '.duck', 'notebook.md'))), false);
+  assert.equal(deny(editInput(on, path.join(os.tmpdir(), 'elsewhere.md'))), false);
+});
+
+test('checkpoint: extensions, relative paths and Write of a new file', () => {
+  const dir = project({ '.duck/config.md': 'Switch: on\n', 'sub/x.txt': 'a' });
+  for (const ext of ['.md', '.tex', '.txt', '.rst', '.typ', '.org', '.qmd', '.Rmd']) {
+    const data = project();
+    const out = checkpointRun({ tool_name: 'Write', cwd: dir, session_id: 's', prompt_id: 'p', tool_input: { file_path: `new${ext}`, content: 'x' } }, data);
+    assert.equal(out && out.permissionDecision, 'deny', ext);
+    // English config: English reminder.
+    assert.match(out.permissionDecisionReason, /This is not the student refusing/);
+  }
+  const data = project();
+  const rel = checkpointRun({ tool_name: 'Edit', cwd: path.join(dir, 'sub'), session_id: 's', prompt_id: 'p', tool_input: { file_path: 'x.txt', old_string: 'a', new_string: 'b' } }, data, { CLAUDE_PROJECT_DIR: dir });
+  assert.equal(rel.permissionDecision, 'deny');
+});
+
+test('checkpoint reads apply_patch paths (Codex) and refuses the whole patch', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a', 'run.py': 'a' });
+  const patch = (lines) => ['*** Begin Patch', ...lines, '*** End Patch'].join('\n');
+  assert.deepEqual(duck.patchPaths(patch(['*** Update File: a.py', '*** Move to: b.md', '*** Add File: c.tex', '*** Delete File: d.txt'])), ['a.py', 'b.md', 'c.tex', 'd.txt']);
+  const codex = (command, data) => checkpointRun({ tool_name: 'apply_patch', cwd: dir, session_id: 's', turn_id: 't1', tool_input: { command } }, data);
+  assert.equal(codex(patch(['*** Update File: run.py']), project()), null);
+  assert.equal(codex(patch(['*** Update File: run.py', '*** Update File: plan.md']), project()).permissionDecision, 'deny');
+  assert.equal(codex(patch(['*** Update File: run.py', '*** Move to: notes.md']), project()).permissionDecision, 'deny');
+  assert.equal(codex(42, project()), null);
+});
+
+test('checkpoint: a refusal is one JSON object; records and the test log', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n', '.duck/notebook.md': '- 10-26 旧的一条\n' });
+  const data = project();
+  const run = runHook('PreToolUse', { CLAUDE_PLUGIN_ROOT: ROOT, CLAUDE_PLUGIN_DATA: data }, JSON.stringify(editInput(dir, path.join(dir, 'plan.md'))));
+  assert.doesNotThrow(() => JSON.parse(run.stdout));
+  const cp = path.join(data, 'checkpoint');
+  assert.ok(fs.existsSync(path.join(cp, 's1--p1')));
+  assert.equal(fs.statSync(cp).mode & 0o777, 0o700);
+  // No LOG, no log.txt.
+  assert.equal(fs.existsSync(path.join(cp, 'log.txt')), false);
+  // With LOG: one JSON line per call, the allow included.
+  fs.writeFileSync(path.join(cp, 'LOG'), '');
+  checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data);
+  checkpointRun(editInput(dir, path.join(dir, 'plan.md'), { prompt_id: 'p9' }), data);
+  const lines = fs.readFileSync(path.join(cp, 'log.txt'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => [l.session, l.turn, l.decision, l.host]), [['s1', 'p1', 'allow', 'claude-code'], ['s1', 'p9', 'deny', 'claude-code']]);
+  // A record write that only adds still goes through allowRecord in the same turn.
+  const add = { old_string: '- 10-26 旧的一条', new_string: '- 10-26 旧的一条\n- 10-27 新的一条' };
+  const rec = checkpointRun({ ...editInput(dir, path.join(dir, '.duck', 'notebook.md')), tool_input: { file_path: path.join(dir, '.duck', 'notebook.md'), ...add } }, data);
+  assert.equal(rec.permissionDecision, 'allow');
+});
+
+test('checkpoint: a log that cannot be opened does not change the decision', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const data = project();
+  const cp = path.join(data, 'checkpoint');
+  fs.mkdirSync(cp, { recursive: true });
+  fs.writeFileSync(path.join(cp, 'LOG'), '');
+  fs.symlinkSync('/dev/null', path.join(cp, 'log.txt'));
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data).permissionDecision, 'deny');
+});
+
+test('checkpoint: a symlinked turn record is not followed; pruning keeps LOG', () => {
+  const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
+  const data = project();
+  const cp = path.join(data, 'checkpoint');
+  fs.mkdirSync(cp, { recursive: true });
+  fs.symlinkSync(path.join(data, 'target'), path.join(cp, 's1--p1'));
+  // The name exists (as a link): treated as already refused, edit let through, link target not created.
+  assert.equal(checkpointRun(editInput(dir, path.join(dir, 'plan.md')), data), null);
+  assert.equal(fs.existsSync(path.join(data, 'target')), false);
+  const old = path.join(cp, 'old--1');
+  fs.writeFileSync(old, '');
+  fs.writeFileSync(path.join(cp, 'LOG'), '');
+  const past = (Date.now() - 8 * 24 * 3600 * 1000) / 1000;
+  fs.utimesSync(old, past, past);
+  duck.pruneCheckpoint(cp);
+  assert.equal(fs.existsSync(old), false);
+  assert.equal(fs.existsSync(path.join(cp, 'LOG')), true);
+});
+
+test('checkpoint falls back to XDG_STATE_HOME without CLAUDE_PLUGIN_DATA', () => {
+  assert.equal(duck.checkpointDir({ XDG_STATE_HOME: '/x/state' }), path.join('/x/state', 'ducktor', 'checkpoint'));
+  assert.equal(duck.checkpointDir({ HOME: '/h' }), path.join('/h', '.local', 'state', 'ducktor', 'checkpoint'));
+  assert.equal(duck.checkpointDir({ CLAUDE_PLUGIN_DATA: '/d', XDG_STATE_HOME: '/x' }), path.join('/d', 'checkpoint'));
+});

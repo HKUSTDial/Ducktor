@@ -7,7 +7,9 @@
 //   allow          PreToolUse in Claude Code: let it read the plugin's own files (library/,
 //                  cards/, handbook/ ...) and add to the records Ducktor keeps in the project's
 //                  .duck/ (notebook, decisions, reports) without a permission prompt; anything
-//                  else gets no answer, so the host asks as usual
+//                  else gets no answer, so the host asks as usual. Also the edit checkpoint
+//                  (Claude Code and Codex): the first edit of a text draft in a turn is refused
+//                  once, with the reminder in rules/checkpoint.md
 // Rule text stays in rules/ (or the student's copy in .duck/skills/), never in this file.
 'use strict';
 
@@ -348,12 +350,153 @@ function allowRecord(input) {
   }));
 }
 
+// ---------------------------------------------------------------------------------------
+// Edit checkpoint (0.2.4). In a project with the switch on or quiet, the first edit of a text
+// draft in each turn is refused once, with the reminder from rules/checkpoint.md: undecided
+// research decisions stay as the draft has them and are listed for the student. On 11-05 the
+// model wrote such decisions into the draft before asking in 4 of 5 re-tests, although
+// rules/core.md says to list them; a reminder at the moment of editing is the remedy chosen
+// (design: agent-hosts/ducktor/out/design-0.2.4/DESIGN.md). Every doubt lets the edit through.
+
+const TEXT_DRAFT = new Set(['.md', '.tex', '.txt', '.rst', '.typ', '.org', '.qmd', '.rmd']);
+const SAFE_ID = /^[\w.-]{1,128}$/;
+const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit'];
+
+// Paths an apply_patch command touches: Update, Add and Delete lines, and the new path of a move.
+function patchPaths(command) {
+  if (typeof command !== 'string') return [];
+  const out = [];
+  for (const m of command.matchAll(/^\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)\s*$/gm)) out.push(m[1]);
+  return out;
+}
+
+// True for a file inside the project, outside .duck/, with a text-draft extension.
+function isTextDraft(file, project) {
+  if (typeof file !== 'string' || !file || !project) return false;
+  if (!TEXT_DRAFT.has(path.extname(file).toLowerCase())) return false;
+  const root = realPathOf(path.resolve(project));
+  const real = realPathOf(path.resolve(file));
+  if (!root || !real) return false;
+  const rel = path.relative(root, real);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+  return rel.split(path.sep)[0] !== '.duck';
+}
+
+// The decision without any file I/O except reading paths. Returns 'allow' or 'claim': claim
+// means the caller should try to create this turn's record and refuse when that succeeds.
+// facts: { mode, isSubagent, session, turn, cwd, project, files }.
+function checkpointDecision(facts) {
+  if (facts.mode !== 'on' && facts.mode !== 'quiet') return 'allow';
+  if (facts.isSubagent) return 'allow';
+  if (!SAFE_ID.test(String(facts.session || '')) || !SAFE_ID.test(String(facts.turn || ''))) return 'allow';
+  const base = facts.cwd || facts.project;
+  const files = (facts.files || []).filter((f) => typeof f === 'string' && f);
+  if (files.some((f) => !path.isAbsolute(f)) && !base) return 'allow';
+  if (!files.some((f) => isTextDraft(path.resolve(base || '/', f), facts.project))) return 'allow';
+  return 'claim';
+}
+
+// Where the turn records and the test log live. CLAUDE_PLUGIN_DATA when the host sets it
+// (Claude Code and Codex); otherwise $XDG_STATE_HOME/ducktor, or ~/.local/state/ducktor.
+function checkpointDir(env = process.env) {
+  if (env.CLAUDE_PLUGIN_DATA) return path.join(env.CLAUDE_PLUGIN_DATA, 'checkpoint');
+  const state = env.XDG_STATE_HOME || path.join(env.HOME || require('os').homedir(), '.local', 'state');
+  return path.join(state, 'ducktor', 'checkpoint');
+}
+
+// Creates this turn's record. True only when this call created it; false when it exists or
+// anything fails (the edit is then let through).
+function claimTurn(dir, key) {
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const c = fs.constants;
+    fs.closeSync(fs.openSync(path.join(dir, key), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600));
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// One line of the test log, only when checkpoint/LOG exists. A failure here changes nothing.
+function writeCheckpointLog(dir, entry, root = ROOT) {
+  try {
+    if (!fs.existsSync(path.join(dir, 'LOG'))) return;
+    let build = 'unknown';
+    try { build = fs.readFileSync(path.join(root, 'BUILD'), 'utf8').trim() || 'unknown'; } catch (err) { /* none */ }
+    const c = fs.constants;
+    const fd = fs.openSync(path.join(dir, 'log.txt'), c.O_WRONLY | c.O_CREAT | c.O_APPEND | c.O_NOFOLLOW, 0o600);
+    try {
+      fs.writeSync(fd, `${JSON.stringify({ ...entry, time: new Date().toISOString(), build })}\n`);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (err) { /* the test log is optional */ }
+}
+
+// Removes turn records older than seven days. LOG and log.txt stay.
+function pruneCheckpoint(dir, now = Date.now()) {
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      if (name === 'LOG' || name === 'log.txt') continue;
+      const file = path.join(dir, name);
+      const stat = fs.lstatSync(file);
+      if (stat.isFile() && now - stat.mtimeMs > 7 * 24 * 3600 * 1000) fs.unlinkSync(file);
+    }
+  } catch (err) { /* nothing to prune */ }
+}
+
+// The reminder from rules/checkpoint.md: the English section when the config is in English;
+// '' when the file or the section is missing (the checkpoint then lets the edit through).
+function checkpointReminder(config, root = ROOT) {
+  const text = readText(path.join(root, 'rules', 'checkpoint.md')) || '';
+  const english = typeof config === 'string' && ENGLISH_CONFIG.test(config);
+  const section = sectionOf(text, english ? /^##[ \t]*English[ \t]*$/m : /^##[ \t]*中文[ \t]*$/m)
+    .replace(/^##.*\n+/, '').trim();
+  return section;
+}
+
+// PreToolUse for Write, Edit, MultiEdit (Claude Code) and apply_patch (Codex). Prints a deny
+// and returns true when it refuses; returns false otherwise, printing nothing.
+function checkpoint(input) {
+  const toolInput = input.tool_input || {};
+  const project = [process.env.CLAUDE_PROJECT_DIR, input.cwd].find((p) => typeof p === 'string' && p);
+  if (!project) return false;
+  const config = readText(path.join(project, '.duck', 'config.md'));
+  const host = input.tool_name === 'apply_patch' ? 'codex' : 'claude-code';
+  const files = input.tool_name === 'apply_patch' ? patchPaths(toolInput.command) : [toolInput.file_path];
+  const facts = {
+    mode: modeOf(config).mode,
+    isSubagent: typeof input.agent_id === 'string' && input.agent_id !== '',
+    session: input.session_id,
+    turn: host === 'codex' ? input.turn_id : input.prompt_id,
+    cwd: typeof input.cwd === 'string' ? input.cwd : '',
+    project,
+    files,
+  };
+  const dir = checkpointDir();
+  const reminder = checkpointReminder(config);
+  let decision = reminder ? checkpointDecision(facts) : 'allow';
+  if (decision === 'claim') decision = claimTurn(dir, `${facts.session}--${facts.turn}`) ? 'deny' : 'allow';
+  writeCheckpointLog(dir, { host, session: String(facts.session || ''), turn: String(facts.turn || ''), tool: input.tool_name, subagent: facts.isSubagent, decision });
+  if (decision !== 'deny') return false;
+  fs.writeSync(1, JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reminder,
+    },
+  }));
+  return true;
+}
+
 function main(command) {
   // allow-read is the name the hooks file used before writes were added.
   if (command === 'allow' || command === 'allow-read') {
     try {
       const input = readInput();
-      if (['Write', 'Edit', 'MultiEdit'].includes(input.tool_name)) allowRecord(input);
+      if (EDIT_TOOLS.includes(input.tool_name)) {
+        if (!checkpoint(input)) allowRecord(input);
+      } else if (input.tool_name === 'apply_patch') checkpoint(input);
       else if (input.tool_name === 'Bash') refuseShellLogWrite(input);
       else allowRead(input);
     } catch (err) { /* stay silent: the host asks as usual */ }
@@ -361,7 +504,10 @@ function main(command) {
   }
   let context = '';
   try {
-    if (command === 'session-start') context = sessionStart();
+    if (command === 'session-start') {
+      pruneCheckpoint(checkpointDir());
+      context = sessionStart();
+    }
   } catch (err) {
     context = `Ducktor 插件根目录：${ROOT}\n\n（开场脚本出错，常驻规则这次没加载：${err.message}）`;
   }
@@ -375,6 +521,10 @@ function main(command) {
   fs.writeSync(1, JSON.stringify(output));
 }
 
-module.exports = { main, modeOf, buildContext, insideRoot, ROOT };
+module.exports = {
+  main, modeOf, buildContext, insideRoot, ROOT,
+  // Edit checkpoint, also used by DeepSeek-Ducktor.
+  patchPaths, isTextDraft, checkpointDecision, checkpointDir, claimTurn, writeCheckpointLog, pruneCheckpoint, checkpointReminder,
+};
 
 if (require.main === module) main(process.argv[2]);

@@ -479,6 +479,22 @@ rc12 的结果（Ducktor 8786f36，DeepSeek-Ducktor ae30950），最终版：
 
 留到下一版的测试问题（这一版不改，只记下）：DeepSeek-Ducktor 的 tests/e2e/flow.cjs 把正常结束但回复为空的一轮算跑成（第四轮 13-33-01 的 carry-num 是空回复）；try-first-check 的必过项任何问号都过；scope 的「还写着 LongBench」在表注里也能找到，会空过；carry-num-ok 只查摘要，摘要以外（比如引言）的 31% 不查；core.md 第 1 条（「我自己定」的每一类都问打算怎么做）和包装命令第 2 步（只对想自己先试的问打算）写法不一致。0.2.3 第四轮起写的起跑时间（13:30、14:43、15:27）是 UTC，日志里是 -08:00；别处的时间看各自标注，同一段里前面标了的照前面；结果目录名里的时间是 UTC；都没标的以日志为准。
 
+### 2026-11-09，0.2.4 探针（判据，开跑前写）
+
+改动：bin/duck.js 的检查点（设计稿 agent-hosts/ducktor/out/design-0.2.4/DESIGN.md）。开关为 on 或 quiet 时，每一轮第一次修改文本稿被拒绝一次，提醒在 rules/checkpoint.md。这一节只管探针：确认检查点通不通。判据照设计稿「测试」一节，这里只列这一次要跑的几项。
+
+1. 插件来源：Claude Code 用 `PLUGIN=/SSD1/wuyin/project/Ducktor-work/release-0.2.4`，工作树根目录有 BUILD（`git rev-parse HEAD`），BUILD 写进 `.git/info/exclude`。
+2. 每个探针用新会话，只发一条学生消息。项目在 /tmp 下，`.duck/config.md` 写「开关：on」，有一份 plan.md。
+3. Claude Code 探针 A：学生消息让 AI 改 plan.md 的一处措辞。
+   - 必过：会话记录里第一次 Edit 或 Write 的工具结果含 rules/checkpoint.md 中文一节的全文。
+   - 必过：同一轮里之后有一次对 plan.md 的修改成功。
+   - 必过：checkpoint/log.txt 里这个会话 id 有一行 deny，之后的修改是 allow；日志行的 build 等于 BUILD。
+   - 只记录：AI 的回复有没有提这次检查、有没有问「要不要继续」。
+4. Claude Code 探针 B：同一项目，学生消息让 AI 在一次回复里改 plan.md 和 abstract.md 两处。只记录：两次调用各是拒绝还是放行，AI 有没有回头查已放行的那处。
+5. Claude Code 探针 C：开关改成 off，同样的学生消息。必过：日志里这个会话 id 全是 allow，会话记录里没有提醒。
+6. 记录：checkpoint/ 落在哪个位置（`CLAUDE_PLUGIN_DATA` 下还是后备位置）。另一个位置靠单元测试 `checkpoint falls back to XDG_STATE_HOME without CLAUDE_PLUGIN_DATA` 覆盖。
+7. 探针 A 的三项必过有一项不过：先查原因，不往下跑 e2e。
+
 ### 更早的结果
 
 

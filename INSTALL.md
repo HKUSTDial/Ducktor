@@ -29,7 +29,7 @@ codex plugin marketplace add yinwu01/Ducktor
 codex plugin add duck@ducktor
 ```
 
-然后开 Codex，在 `/hooks` 里信任 Ducktor 的两条 hook（第一条在开会话时加载规则；第二条在改文件前运行：开启了 Ducktor 的项目里，每一轮第一次改文本稿时先提醒 AI 一次，另外给 Claude Code 放行读插件文件、写笔记），敲 `$duck:duck` 看菜单。
+然后开 Codex，在 `/hooks` 里信任 Ducktor 的两条 hook（第一条在开会话时加载规则；第二条是给 Claude Code 放行读插件文件、写笔记用的，Codex 用不上），敲 `$duck:duck` 看菜单。
 
 - **更新**：`codex plugin marketplace upgrade ducktor`，再 `codex plugin add duck@ducktor`；hook 有改动时要在 `/hooks` 里重新信任。0.2.0 改了两条 hook 的命令，更新到 0.2.0 以后两条都要重新信任。
 - **卸载**：`codex plugin remove duck@ducktor`，`codex plugin marketplace remove ducktor`。

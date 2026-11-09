@@ -549,7 +549,9 @@ test('checkpoint reads apply_patch paths (Codex) and refuses the whole patch', (
   const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a', 'run.py': 'a' });
   const patch = (lines) => ['*** Begin Patch', ...lines, '*** End Patch'].join('\n');
   assert.deepEqual(duck.patchPaths(patch(['*** Update File: a.py', '*** Move to: b.md', '*** Add File: c.tex', '*** Delete File: d.txt'])), ['a.py', 'b.md', 'c.tex', 'd.txt']);
-  const codex = (command, data) => checkpointRun({ tool_name: 'apply_patch', cwd: dir, session_id: 's', turn_id: 't1', tool_input: { command } }, data);
+  const codex = (command, data, env = { DUCK_CODEX_CHECKPOINT: '1' }) => checkpointRun({ tool_name: 'apply_patch', cwd: dir, session_id: 's', turn_id: 't1', tool_input: { command } }, data, env);
+  // Off by default: Codex waits for its probes (0.2.4 design, choice 6).
+  assert.equal(codex(patch(['*** Update File: plan.md']), project(), {}), null);
   assert.equal(codex(patch(['*** Update File: run.py']), project()), null);
   assert.equal(codex(patch(['*** Update File: run.py', '*** Update File: plan.md']), project()).permissionDecision, 'deny');
   assert.equal(codex(patch(['*** Update File: run.py', '*** Move to: notes.md']), project()).permissionDecision, 'deny');
@@ -652,7 +654,7 @@ test('checkpoint: ids holding "--" are let through, so record names cannot colli
 test('checkpoint: Codex relative paths resolve against cwd; session start prunes', () => {
   const dir = project({ '.duck/config.md': '开关：on\n', 'docs/plan.md': 'a' });
   const data = project();
-  const out = checkpointRun({ tool_name: 'apply_patch', cwd: path.join(dir, 'docs'), session_id: 's', turn_id: 't', tool_input: { command: '*** Begin Patch\n*** Update File: plan.md\n*** End Patch' } }, data, { CLAUDE_PROJECT_DIR: dir });
+  const out = checkpointRun({ tool_name: 'apply_patch', cwd: path.join(dir, 'docs'), session_id: 's', turn_id: 't', tool_input: { command: '*** Begin Patch\n*** Update File: plan.md\n*** End Patch' } }, data, { CLAUDE_PROJECT_DIR: dir, DUCK_CODEX_CHECKPOINT: '1' });
   assert.equal(out.permissionDecision, 'deny');
   const cp = path.join(data, 'checkpoint');
   const old = path.join(cp, 'old--x');

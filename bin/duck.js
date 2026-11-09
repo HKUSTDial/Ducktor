@@ -8,8 +8,9 @@
 //                  cards/, handbook/ ...) and add to the records Ducktor keeps in the project's
 //                  .duck/ (notebook, decisions, reports) without a permission prompt; anything
 //                  else gets no answer, so the host asks as usual. Also the edit checkpoint
-//                  (Claude Code and Codex): the first edit of a text draft in a turn is refused
-//                  once, with the reminder in rules/checkpoint.md
+//                  (Claude Code; Codex only with DUCK_CODEX_CHECKPOINT=1 until its probes pass):
+//                  the first edit of a text draft in a turn is refused once, with the reminder in
+//                  rules/checkpoint.md
 // Rule text stays in rules/ (or the student's copy in .duck/skills/), never in this file.
 'use strict';
 
@@ -578,7 +579,11 @@ function main(command) {
         let refused = false;
         try { refused = checkpoint(input); } catch (err) { refused = false; }
         if (!refused) allowRecord(input);
-      } else if (input.tool_name === 'apply_patch') checkpoint(input);
+      } else if (input.tool_name === 'apply_patch') {
+        // Codex goes through the checkpoint only after its probes pass (0.2.4 design, choice 6).
+        // Until then the probes and the tests turn it on with DUCK_CODEX_CHECKPOINT=1.
+        if (process.env.DUCK_CODEX_CHECKPOINT === '1') checkpoint(input);
+      }
       else if (input.tool_name === 'Bash') refuseShellLogWrite(input);
       else allowRead(input);
     } catch (err) { /* stay silent: the host asks as usual */ }

@@ -92,7 +92,7 @@ function runCodex(prompt, session, opts = {}) {
 
 // Normalizes one host transcript into { session, reply, reads, tools, injected, cost }.
 function parse(stdout) {
-  const t = { session: null, reply: '', reads: [], tools: [], denials: [], refusedLogWrites: 0, checkpointRefusals: 0, injected: '', cost: 0, errors: [] };
+  const t = { session: null, reply: '', reads: [], tools: [], denials: [], refusedLogWrites: 0, checkpointRefusals: 0, guardRefusals: 0, injected: '', cost: 0, errors: [] };
   const texts = [];
   for (const line of stdout.split('\n')) {
     let ev;
@@ -100,11 +100,13 @@ function parse(stdout) {
     if (HOST === 'claude') {
       if (ev.type === 'system' && ev.session_id) t.session = ev.session_id;
       if (ev.type === 'system' && ev.subtype === 'hook_response') t.injected += String(ev.output || ev.stdout || '');
-      // The edit checkpoint's refusal comes back as a tool result that carries the reminder.
+      // The edit checkpoint's refusal comes back as a tool result that carries the reminder; the
+      // record guard's refusal of a whole Write over notebook.md or decisions.md, as one with its reason.
       if (ev.type === 'user' && Array.isArray(ev.message?.content)) {
         for (const c of ev.message.content) {
           const body = c && c.type === 'tool_result' ? (Array.isArray(c.content) ? c.content.map((x) => x.text || '').join(' ') : String(c.content || '')) : '';
           if (CHECKPOINT_MARK.test(body)) t.checkpointRefusals += 1;
+          else if (REWRITE_GUARD_MARK.test(body)) t.guardRefusals += 1;
         }
       }
       if (ev.type === 'assistant') {
@@ -285,6 +287,7 @@ const principleOf = (l) => l.split('｜')[1] || l;
 // 「先小测、再全量」 plans a small experiment run, not a quiz (11-04 rc11, DeepSeek more).
 // A shell command that writes .duck/notebook.md or .duck/decisions.md (bin/duck.js refuses these).
 const CHECKPOINT_MARK = /Ducktor 插件的自动检查|Automatic check by the Ducktor plugin/;
+const REWRITE_GUARD_MARK = /keeps the student's earlier entries and this Write would replace them/;
 const LOG_WRITE = /(>>?|\btee\b|\b(sed|perl)\b[^|;&]*\s-[a-zA-Z]*i)[^|;&]*\.duck\/(notebook|decisions)\.md/;
 const QUIZ = /考考你|(给你|出个|出一道|来个|做个|做一次)小测|小测(一下|题)|测验|测一测|思考题|练习题|课后作业|留个作业|布置.{0,4}作业|给你打分|打几分|你的得分|成长档案/;
 // /duck-why talks like a mentor and grounds the lesson in named researchers. Names and views may
@@ -814,9 +817,10 @@ function globalChecks(transcripts) {
     // The hook's own refusal of a shell write to a log is listed as a denial too, but no prompt
     // reaches the student for it (rc12 loop: the only denial of one run was that). So is the edit
     // checkpoint's refusal of a turn's first text-draft edit (0.2.4): the student sees the refusal
-    // line, not an approval prompt (11-09 regression, main: propose).
+    // line, not an approval prompt (11-09 regression, main: propose). Nor is the refusal of a whole
+    // Write over notebook.md or decisions.md: the model is told to Read and Edit (11-09 probe).
     ['should', 'no tool call needed the student\'s approval', () => HOST !== 'claude'
-      || transcripts.every((t) => (t.denials || []).length === (t.refusedLogWrites || 0) + (t.checkpointRefusals || 0))],
+      || transcripts.every((t) => (t.denials || []).length === (t.refusedLogWrites || 0) + (t.checkpointRefusals || 0) + (t.guardRefusals || 0))],
     // The short why names cards by title; a bare card number is jargon the student cannot read.
     ['should', 'no card number on its own in a short why', () => transcripts.map((t) => lastWhy(t.reply)).every((w) => !bareCardId(w))],
     // Most notebook lines are written by the AI; quoting one as the student's own is wrong.
@@ -913,7 +917,7 @@ function main() {
       const again = HOST === 'claude' ? runClaude(answer, session, opts) : runCodex(answer, session, opts);
       fs.writeFileSync(path.join(OUT, `${String(results.length + 1).padStart(2, '0')}-${stage.name}-followup.jsonl`), again.stdout || '');
       const t2 = parse(again.stdout || '');
-      t = { ...t2, injected: `${t.injected}\n${t2.injected}`, reads: [...t.reads, ...t2.reads], tools: [...t.tools, ...t2.tools], denials: [...(t.denials || []), ...(t2.denials || [])], refusedLogWrites: (t.refusedLogWrites || 0) + (t2.refusedLogWrites || 0), checkpointRefusals: (t.checkpointRefusals || 0) + (t2.checkpointRefusals || 0), reply: `${t.reply}\n\n[学生] ${answer}\n\n${t2.reply}`, cost: t2.cost, sessionId: t.sessionId, earlierReads: t.earlierReads };
+      t = { ...t2, injected: `${t.injected}\n${t2.injected}`, reads: [...t.reads, ...t2.reads], tools: [...t.tools, ...t2.tools], denials: [...(t.denials || []), ...(t2.denials || [])], refusedLogWrites: (t.refusedLogWrites || 0) + (t2.refusedLogWrites || 0), checkpointRefusals: (t.checkpointRefusals || 0) + (t2.checkpointRefusals || 0), guardRefusals: (t.guardRefusals || 0) + (t2.guardRefusals || 0), reply: `${t.reply}\n\n[学生] ${answer}\n\n${t2.reply}`, cost: t2.cost, sessionId: t.sessionId, earlierReads: t.earlierReads };
       if (HOST === 'codex') t.injected = codexInjected(session);
       checks = evaluate(t);
     }

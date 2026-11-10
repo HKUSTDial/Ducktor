@@ -94,6 +94,11 @@ function runCodex(prompt, session, opts = {}) {
 function parse(stdout) {
   const t = { session: null, reply: '', reads: [], tools: [], denials: [], refusedLogWrites: 0, checkpointRefusals: 0, guardRefusals: 0, injected: '', cost: 0, errors: [] };
   const texts = [];
+  // Ids of the error results that carry the checkpoint's reminder or the record guard's reason;
+  // only the ones the host also lists as denied are counted (a Read of rules/checkpoint.md carries
+  // the reminder text too, and is no refusal).
+  const checkpointIds = new Set();
+  const guardIds = new Set();
   for (const line of stdout.split('\n')) {
     let ev;
     try { ev = JSON.parse(line); } catch (err) { continue; }
@@ -105,8 +110,9 @@ function parse(stdout) {
       if (ev.type === 'user' && Array.isArray(ev.message?.content)) {
         for (const c of ev.message.content) {
           const body = c && c.type === 'tool_result' ? (Array.isArray(c.content) ? c.content.map((x) => x.text || '').join(' ') : String(c.content || '')) : '';
-          if (CHECKPOINT_MARK.test(body)) t.checkpointRefusals += 1;
-          else if (REWRITE_GUARD_MARK.test(body)) t.guardRefusals += 1;
+          if (!c || !c.is_error) continue;
+          if (CHECKPOINT_MARK.test(body)) checkpointIds.add(c.tool_use_id);
+          else if (REWRITE_GUARD_MARK.test(body)) guardIds.add(c.tool_use_id);
         }
       }
       if (ev.type === 'assistant') {
@@ -118,7 +124,7 @@ function parse(stdout) {
         }
       }
       // The student sees every message of the turn, not only the last one in `result`.
-      if (ev.type === 'result') { t.reply = texts.length ? texts.join('\n\n') : (ev.result || ''); t.cost = ev.total_cost_usd || 0; t.session = ev.session_id || t.session; t.denials = (ev.permission_denials || []).map((d) => `${d.tool_name} ${JSON.stringify(d.tool_input || {}).slice(0, 120)}`); t.refusedLogWrites = (ev.permission_denials || []).filter((d) => d.tool_name === 'Bash' && LOG_WRITE.test(String((d.tool_input || {}).command || ''))).length; }
+      if (ev.type === 'result') { t.reply = texts.length ? texts.join('\n\n') : (ev.result || ''); t.cost = ev.total_cost_usd || 0; t.session = ev.session_id || t.session; t.denials = (ev.permission_denials || []).map((d) => `${d.tool_name} ${JSON.stringify(d.tool_input || {}).slice(0, 120)}`); t.refusedLogWrites = (ev.permission_denials || []).filter((d) => d.tool_name === 'Bash' && LOG_WRITE.test(String((d.tool_input || {}).command || ''))).length; t.checkpointRefusals = (ev.permission_denials || []).filter((d) => checkpointIds.has(d.tool_use_id)).length; t.guardRefusals = (ev.permission_denials || []).filter((d) => guardIds.has(d.tool_use_id)).length; }
     } else {
       if (ev.type === 'thread.started') t.session = ev.thread_id;
       const it = ev.item || {};

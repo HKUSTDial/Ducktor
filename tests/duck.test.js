@@ -31,14 +31,15 @@ function project(files = {}) {
 }
 
 // Runs a hook command from hooks/claude-codex-hooks.json the way a host does: through sh,
-// with the input JSON on stdin and only the environment we pass.
+// with the input JSON on stdin and only the environment we pass. The plugin data folder is a
+// fresh temporary one unless the test sets it: without it the edit checkpoint's records fall
+// back to ~/.local/state, and a test run must leave nothing in the home folder. A key set to
+// null is left out, for the test of that fallback.
 function runHook(event, env, stdin) {
   const command = HOOKS[event][0].hooks[0].command;
-  return spawnSync('sh', ['-c', command], {
-    input: stdin,
-    env: { PATH: process.env.PATH, ...env },
-    encoding: 'utf8',
-  });
+  const full = { PATH: process.env.PATH, CLAUDE_PLUGIN_DATA: project(), ...env };
+  for (const key of Object.keys(full)) if (full[key] === null) delete full[key];
+  return spawnSync('sh', ['-c', command], { input: stdin, env: full, encoding: 'utf8' });
 }
 
 test('modeOf reads the switch line in the forms students write', () => {
@@ -651,7 +652,7 @@ test('checkpoint: log.txt as a link is not followed', () => {
 test('checkpoint without CLAUDE_PLUGIN_DATA writes under XDG_STATE_HOME', () => {
   const dir = project({ '.duck/config.md': '开关：on\n', 'plan.md': 'a\n' });
   const state = project();
-  const run = runHook('PreToolUse', { CLAUDE_PLUGIN_ROOT: ROOT, XDG_STATE_HOME: state }, JSON.stringify(editInput(dir, path.join(dir, 'plan.md'))));
+  const run = runHook('PreToolUse', { CLAUDE_PLUGIN_ROOT: ROOT, CLAUDE_PLUGIN_DATA: null, XDG_STATE_HOME: state }, JSON.stringify(editInput(dir, path.join(dir, 'plan.md'))));
   assert.equal(JSON.parse(run.stdout).hookSpecificOutput.permissionDecision, 'deny');
   assert.ok(fs.existsSync(path.join(state, 'ducktor', 'checkpoint', 's1--p1')));
 });

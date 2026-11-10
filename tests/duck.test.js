@@ -90,13 +90,21 @@ test('not turned on and off: the hook gives no rules, the commands carry the bas
       // The hub only lists, switches and routes; the command it picks carries the basics. It
       // keeps the rules it needs itself: Read for plugin files, Write/Edit for .duck/ (and say so
       // when a write failed), the student's language, no em-dash, the git note, the Codex form of
-      // /duck-xxx, and that quiet still asks first.
+      // /duck-xxx, and that quiet still asks first. When the student has only typed a command,
+      // the language comes from the project it listed (the student's notes and .duck/, not the
+      // paper or README), and the git note only follows a .git folder it listed: in 0.2.3 a
+      // first "/duck on" got a Chinese config for an English student, and twice a git note in a
+      // project with no .git.
       assert.ok(!text.includes('<!-- basics:start -->'), 'duck: no basics block');
       assert.match(text, /用 Read 读，不用 cat/, 'duck: Read for plugin files');
       assert.match(text, /Write、Edit），不用 echo/, 'duck: Write and Edit for .duck/');
-      assert.match(text, /照学生的语言说/, 'duck: the student\'s language');
+      assert.match(text, /下面写给学生的话、表和新建的 config\.md 都用学生的语言/, 'duck: the student\'s language, config.md too');
+      assert.match(text, /还没写过别的话[^\n]*先列一次项目根目录[^\n]*学生自己的笔记/, 'duck: list the project before picking the language');
+      assert.match(text, /论文和 README 不算/, 'duck: the paper and README do not set the language');
+      assert.match(text, /^菜单用什么语言，照开头那一段定。$/m, 'duck: the menu follows the same language rule');
       assert.match(text, /写进 \.duck\/ 的文字不用破折号/, 'duck: no em-dash in .duck/');
       assert.match(text, /\.git\/info\/exclude/, 'duck: the git note when .duck/ is first made');
+      assert.match(text, /列出了 \.git 文件夹时再说[^\n]*没列出 \.git 就不提 git/, 'duck: the git note only after a listed .git');
       assert.match(text, /没写成就照实说/, 'duck: say so when a write failed');
       assert.match(text, /在 Codex 里对学生写成 \$duck:duck-xxx/, 'duck: the Codex form of /duck-xxx');
       assert.match(text, /- quiet：照样先问/, 'duck: quiet still asks first');

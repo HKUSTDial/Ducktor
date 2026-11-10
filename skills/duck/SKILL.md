@@ -15,7 +15,7 @@ disable-model-invocation: true
 2. 后面是 on、quiet 或 off：切开关（第二节）。
 3. 后面是一句话（一个问题或一件要做的事）：替学生挑一条命令，回复第一句写出命令名，再读那条命令的说明照做（第三节）。表里有合适的命令时，这件事看起来一句话就能答，也走命令：学生敲 /duck 就是要命令来做，报告和笔记本里才有这一次的记录。
 
-下面写给学生的话和表都照学生的语言说：学生写英文，就全部译成英文。
+下面写给学生的话、表和新建的 config.md 都用学生的语言：学生写英文，就全部用英文。这次会话里学生还没写过别的话（只敲了 /duck、/duck on 这类）时，先列一次项目根目录（.duck、.git 这类隐藏的也列出来，Claude Code 里用一条 `ls -a`），再读 .duck/ 里已有的文字和学生自己的笔记（名字带 notes、笔记的文件）：这些都是英文写的，才用英文。论文和 README 不算：很多学生用中文交流，论文和 README 用英文写。有中文的，或者看不出来，用中文，回复最后加一行英文：「Prefer English? Write to me in English and I will answer in English.」
 
 
 ## 一、后面什么都没有：列菜单
@@ -45,7 +45,7 @@ disable-model-invocation: true
 
 在 Codex 里，命令写成 $duck:duck-review 这样，最省事的用法写成 $duck:duck 帮我审一下论文初稿。
 
-学生只敲了 /duck，这次会话里也没有学生写的别的话时，看 .duck/ 里已有的文字和学生自己的笔记（notes 这类）：这些都是英文写的，才用英文列。论文和 README 不算：很多学生用中文交流，论文和 README 用英文写。有中文的，或者看不出来，用中文列，最后加一行英文：「Prefer English? Write to me in English and I will answer in English.」
+菜单用什么语言，照开头那一段定。
 
 列完再做三件事：
 - 读项目的 .duck/config.md，用一句话说 Ducktor 在这个项目开没开、开在哪一档，不用提文件名。没有这个文件，文件里没有「开关：」那一行（英文写的 config 里是「Switch:」），或者写的不是 on、quiet（中文的开、打开、开启、启用算 on，静音、安静算 quiet），就是没开启：平时不出声，只有敲命令时才动。写的是 off 时，也说没开启，可以补一句开关写着 off，和刚装好时一样；不说「关掉了」。config.md 里关掉的命令，在表里标「已关」；一条都没关，就不提。
@@ -54,7 +54,7 @@ disable-model-invocation: true
 
 ## 二、后面是 on、quiet 或 off：切开关
 
-1. 改项目 .duck/config.md 里「开关：」那一行（英文 config 里是「Switch:」）：有这一行就改这一行，不另加一行。文件在、没有这一行（之前只记过静音、「回复：短」或关掉的命令），就在第一个标题下面加这一行，别的不动。没有这个文件，就照下面的格式新建。这是学生明确要的，不用再问。改 config.md 用文件编辑工具（Claude Code 里是 Write、Edit），不用 echo、sed 这类 shell 命令，没写成就照实说；写进 .duck/ 的文字不用破折号。第一次建 .duck/ 时顺带说一句（不用问）：这里记着你的设定（config.md）、谁定了什么（decisions.md）、学到的原则（notebook.md）和每次的完整报告（reports/），组会上可以翻。项目里有 .git 文件夹时再说：提交进 git 就和论文一起留档，不想提交就写进 .git/info/exclude；没有就不提 git。
+1. 改项目 .duck/config.md 里「开关：」那一行（英文 config 里是「Switch:」）：有这一行就改这一行，不另加一行。文件在、没有这一行（之前只记过静音、「回复：短」或关掉的命令），就在第一个标题下面加这一行，别的不动。没有这个文件，就照下面的格式新建。这是学生明确要的，不用再问。改 config.md 用文件编辑工具（Claude Code 里是 Write、Edit），不用 echo、sed 这类 shell 命令，没写成就照实说；写进 .duck/ 的文字不用破折号。第一次建 .duck/ 时顺带说一句（不用问）：这里记着你的设定（config.md）、谁定了什么（decisions.md）、学到的原则（notebook.md）和每次的完整报告（reports/），组会上可以翻。项目根目录里列出了 .git 文件夹时再说（还没列过就先列一次，隐藏的也列出来）：提交进 git 就和论文一起留档，不想提交就写进 .git/info/exclude；没列出 .git 就不提 git。
 2. 告诉学生改了哪一行、改成了什么，以及这一档的意思：
    - on：平时干活也跟着：要紧的研究决定先问，做完一步讲为什么，记决策，结果进论文前对标准；每次命令跑完讲这一步的道理，完整报告存进 .duck/reports/。说的时候不用「常驻规则」这类说法；
    - quiet：照样先问，照记照存，对话里不放；平时干活用到的原则也照样记进笔记本；

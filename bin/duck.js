@@ -8,9 +8,11 @@
 //                  cards/, handbook/ ...) and add to the records Ducktor keeps in the project's
 //                  .duck/ (notebook, decisions, reports) without a permission prompt; anything
 //                  else gets no answer, so the host asks as usual. Also the edit checkpoint
-//                  (Claude Code; Codex only with DUCK_CODEX_CHECKPOINT=1 until its probes pass):
-//                  the first edit of a text draft in a turn is refused once, with the reminder in
-//                  rules/checkpoint.md
+//                  (Claude Code only for now): the first edit of a text draft in a turn is refused
+//                  once, with the reminder in rules/checkpoint.md. Codex stays off until its
+//                  probes pass; turning it on takes DUCK_CODEX_CHECKPOINT=1 here, apply_patch in
+//                  the PreToolUse matcher of hooks/claude-codex-hooks.json, and trusting the
+//                  changed hook again in Codex's /hooks
 // Rule text stays in rules/ (or the student's copy in .duck/skills/), never in this file.
 'use strict';
 
@@ -582,7 +584,9 @@ function main(command) {
         if (!refused) allowRecord(input);
       } else if (input.tool_name === 'apply_patch') {
         // Codex goes through the checkpoint only after its probes pass (0.2.4 design, choice 6).
-        // Until then the probes and the tests turn it on with DUCK_CODEX_CHECKPOINT=1.
+        // Until then the probes and the tests turn it on with DUCK_CODEX_CHECKPOINT=1. The shipped
+        // hooks file does not send apply_patch here yet (its PreToolUse matcher lacks it), so this
+        // branch also needs that matcher before Codex users get the check.
         if (process.env.DUCK_CODEX_CHECKPOINT === '1') checkpoint(input);
       }
       else if (input.tool_name === 'Bash') refuseShellLogWrite(input);

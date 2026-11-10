@@ -15,7 +15,7 @@ disable-model-invocation: true
 2. 后面是 on、quiet 或 off：切开关（第二节）。
 3. 后面是一句话（一个问题或一件要做的事）：替学生挑一条命令，回复第一句写出命令名，再读那条命令的说明照做（第三节）。表里有合适的命令时，这件事看起来一句话就能答，也走命令：学生敲 /duck 就是要命令来做，报告和笔记本里才有这一次的记录。
 
-下面写给学生的话、表和新建的 config.md 都用学生的语言：学生写英文，就全部用英文。这次会话里学生还没写过别的话（只敲了 /duck、/duck on 这类）时，先列一次项目根目录（.duck、.git 这类隐藏的也列出来，Claude Code 里用一条 `ls -a`），再读 .duck/ 里已有的文字和学生自己的笔记（名字带 notes、笔记的文件）：这些都是英文写的，才用英文。论文和 README 不算：很多学生用中文交流，论文和 README 用英文写。有中文的，或者看不出来，用中文，回复最后加一行英文：「Prefer English? Write to me in English and I will answer in English.」
+下面写给学生的话、表和新建的 config.md 都用学生的语言：学生写英文，就全部用英文。这次会话里学生还没写过别的话（只敲了 /duck、/duck on 这类）时，先列一次项目根目录（.duck、.git 这类隐藏的也列出来，Claude Code 里用一条 `ls -a`），再读 .duck/ 里已有的文字和学生自己的笔记（名字带 notes、笔记的文件）：这些都是英文写的，才用英文。读这些只为定语言，这一轮不评论里面的内容。论文和 README 不算：很多学生用中文交流，论文和 README 用英文写。有中文的，或者看不出来，用中文，回复最后加一行英文：「Prefer English? Write to me in English and I will answer in English.」
 
 
 ## 一、后面什么都没有：列菜单

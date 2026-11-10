@@ -94,13 +94,15 @@ test('not turned on and off: the hook gives no rules, the commands carry the bas
       // the language comes from the project it listed (the student's notes and .duck/, not the
       // paper or README), and the git note only follows a .git folder it listed: in 0.2.3 a
       // first "/duck on" got a Chinese config for an English student, and twice a git note in a
-      // project with no .git.
+      // project with no .git. The notes are read for the language only: without that line, 3 of
+      // 10 probe replies to a bare "/duck on" discussed what the notes said.
       assert.ok(!text.includes('<!-- basics:start -->'), 'duck: no basics block');
       assert.match(text, /用 Read 读，不用 cat/, 'duck: Read for plugin files');
       assert.match(text, /Write、Edit），不用 echo/, 'duck: Write and Edit for .duck/');
       assert.match(text, /下面写给学生的话、表和新建的 config\.md 都用学生的语言/, 'duck: the student\'s language, config.md too');
       assert.match(text, /还没写过别的话[^\n]*先列一次项目根目录[^\n]*学生自己的笔记/, 'duck: list the project before picking the language');
       assert.match(text, /论文和 README 不算/, 'duck: the paper and README do not set the language');
+      assert.match(text, /读这些只为定语言，这一轮不评论里面的内容/, 'duck: the notes are read for the language only');
       assert.match(text, /^菜单用什么语言，照开头那一段定。$/m, 'duck: the menu follows the same language rule');
       assert.match(text, /写进 \.duck\/ 的文字不用破折号/, 'duck: no em-dash in .duck/');
       assert.match(text, /\.git\/info\/exclude/, 'duck: the git note when .duck/ is first made');

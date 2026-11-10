@@ -438,7 +438,8 @@ function claimTurn(dir, key, content = '') {
 // 11-09), so an edit of the same turn that comes while the transcript does not hold the refused
 // call yet belongs to that batch and is refused too. Two limits keep a host that writes its
 // transcript differently from refusing a whole turn: two minutes after the first refusal, and
-// eight refusals per turn. Anything unexpected lets the edit through.
+// eight refusals in the batch besides the first one (nine in a turn). Anything unexpected lets
+// the edit through.
 const BATCH_MS = 120 * 1000;
 const BATCH_MAX = 8;
 const CALL_ID = /^[\w-]{1,128}$/;

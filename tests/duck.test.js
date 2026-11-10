@@ -702,7 +702,7 @@ test('batch refusals stop without a usable transcript, after eight, and after tw
     assert.equal(run(data, { tool_use_id: 'toolu_1', transcript_path: transcript }).permissionDecision, 'deny');
     assert.equal(run(data, { tool_use_id: 'toolu_2', ...extra }), null);
   }
-  // Eight batch refusals at most.
+  // Eight batch refusals at most besides the first one.
   const data = project();
   assert.equal(run(data, { tool_use_id: 'toolu_0', transcript_path: transcript }).permissionDecision, 'deny');
   for (let i = 1; i <= 8; i += 1) assert.equal(run(data, { tool_use_id: `toolu_${i}`, transcript_path: transcript }).permissionDecision, 'deny');

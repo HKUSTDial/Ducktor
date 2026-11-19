@@ -5,14 +5,14 @@ You must have Claude Code or Codex, and [Node.js](https://nodejs.org/) 18 or a l
 ## Claude Code
 
 ```
-/plugin marketplace add yinwu01/Ducktor
+/plugin marketplace add HKUSTDial/Ducktor
 /plugin install duck@ducktor
 ```
 
 You can also use the command line:
 
 ```
-claude plugin marketplace add yinwu01/Ducktor
+claude plugin marketplace add HKUSTDial/Ducktor
 claude plugin install duck@ducktor
 ```
 
@@ -25,7 +25,7 @@ You install it one time, and it works in all projects. Open a new session in the
 ## Codex
 
 ```
-codex plugin marketplace add yinwu01/Ducktor
+codex plugin marketplace add HKUSTDial/Ducktor
 codex plugin add duck@ducktor
 ```
 

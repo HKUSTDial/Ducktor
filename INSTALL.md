@@ -5,14 +5,14 @@
 ## Claude Code
 
 ```
-/plugin marketplace add yinwu01/Ducktor
+/plugin marketplace add HKUSTDial/Ducktor
 /plugin install duck@ducktor
 ```
 
 命令行里也可以：
 
 ```
-claude plugin marketplace add yinwu01/Ducktor
+claude plugin marketplace add HKUSTDial/Ducktor
 claude plugin install duck@ducktor
 ```
 
@@ -25,7 +25,7 @@ claude plugin install duck@ducktor
 ## Codex
 
 ```
-codex plugin marketplace add yinwu01/Ducktor
+codex plugin marketplace add HKUSTDial/Ducktor
 codex plugin add duck@ducktor
 ```
 

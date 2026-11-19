@@ -30,7 +30,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/demo.zh-CN.webp" width="880" alt="示意动图（非实机录屏）：对比两个终端执行同一指令「实验都做完了，结果在 results/ 里。帮我写成一篇 NeurIPS 论文。」。左侧未安装 Ducktor：AI 直接生成 paper/main.tex，仅附带说明因消融实验只跑了一次未下定论。右侧开启 /duck on：Ducktor 在写入论文前先执行证据标准核查，指出消融实验仅单次运行且 0.1~0.3 的增益未与随机种子波动对比，询问「先补跑 Seed 还是先落笔」；定稿后拆解核心取舍、记录决策归属，并通过 /duck-learn 与 /duck-why 结合经验卡（如 E05）与名家方法论（如 Widom 论文写作指南）完成复盘与知识沉淀。（画面画的是 0.2.0 的讲法。0.2.1 起，对话里不报名家和卡号，复盘不再以同一句话开场，出处写进报告。）">
+  <img src="assets/demo.zh-CN.webp" width="880" alt="示意动图，不是录屏。标题：Agent 负责完成科研；Ducktor 想和你一起学习科研。两个终端收到同一句话：「实验都做完了，结果在 results/ 里。帮我写成一篇 NeurIPS 论文。」左边没装 Ducktor：AI 写完 paper/main.tex，说为了不夸大，消融只跑了一次，0.1 到 0.3 的差没下结论。右边先敲 /duck on：平时也讲为什么、记谁定的，结果进论文前先查三件事。再说同一句话，AI 说整篇论文按 /duck-write 来写，先说最要紧的一处：每个数都只跑了一次，差距没和种子间的波动比过；先照这些数写，不写「显著」，你点头了再补种子。写完讲一条为什么：base 只在英德领先，英法 38.1 比表里每个基线都低；写结论前，先在表里找能推翻它的那一行。三行决策写明哪件是你定的、哪件是 AI 定的。接着敲 /duck-learn：摘要里英法那句是 AI 写的，只比 41.29 高 0.51，又只跑了一次，要么补种子，要么写成「相当」；稿子里推出来的数按 results/ 重算过，都对得上。最后敲 /duck-why 问写引言这一步：第二段讲完 RNN、卷积的不足，先写翻译本身难在哪（远处的词也要连上），再由自注意力回答（paper/main.tex 第 49 行）；原则「先写问题的难处，每条难处对上一个模块」记进笔记本。">
 </p>
 
 <p align="center">
@@ -58,14 +58,14 @@
 </details>
 
 > [!TIP]
-> **用 DeepSeek Harness？** 请用 [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor)：命令和规则与 Ducktor 一致，更适配 DeepSeek Harness 的功能。
+> **用 DeepSeek Harness？** 请用 [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor)：命令和规则与 Ducktor 一致，更适配 DeepSeek Harness 的功能。
 
 ---
 
 ## 核心体验：之前 vs. 之后
 
 <p align="center">
-  <img src="assets/before-after.zh-CN.png" width="880" alt="示意图：同样面对「实验都做完了，结果在 results/ 里。帮我写成一篇 NeurIPS 论文。」。未装 Ducktor 时，AI 一口气生成全文，隐性取舍不透明。使用 Ducktor 时，通过 /duck-outline（关联卡 W08：贡献需具体到删去即改变核心主张）、/duck-write（关联卡 W13：杜绝凭记忆生成伪造引用，逐条核验）、/duck-review（关联卡 R02：大幅性能提升需解耦参数量与训练步数来源）分步推进，每步输出核心取舍、可迁移原则与下次行动建议，并沉淀至 .duck/notebook.md。（画面画的是 0.2.0 的讲法。0.2.1 起，原则和「下次」只在有的时候讲，不是每步都有。）">
+  <img src="assets/before-after.zh-CN.png" width="880" alt="示意图，不是录屏。标题：Agent 负责完成科研；Ducktor 想和你一起学习科研。同一句话：「实验都做完了，结果在 results/ 里。帮我写成一篇 NeurIPS 论文。」左边没装 Ducktor：AI 读完结果，写了 335 行 paper/main.tex，说都做完了。右边分三步：/duck-outline 讲贡献写的是「只用注意力，不用循环和卷积」，删掉这一条，论文的主张就变；/duck-write 讲基线的训练成本取自各家论文，算法可能和我们不同，所以正文写「estimated」「about 2.9×」，原则「用词的强弱，跟着证据的强弱走」记进笔记本；/duck-review 讲英德上 big 比 base 高 1.1，可参数、步数和 dropout 一起变了，这 1.1 算不到哪一处上，下次先做一组只改一处的对照。">
 </p>
 
 当你把实验结果交给常规 AI 撰写论文时，AI 会一次性输出初稿。**核心贡献如何提炼、结论措辞的强弱边界、对比基线的合理性**，全部由模型在黑盒中自行决断。你可能拿到了一篇通顺的草稿，却错失了最重要的方法论训练，也为后续审稿埋下了隐患。
@@ -135,7 +135,7 @@ Ducktor 将过程中的认知资产以纯文本 Markdown 存储在项目本地�
 让你的 agent 帮忙，把下面这段话发给它：
 
 ```text
-帮我安装 Ducktor 插件：https://github.com/yinwu01/Ducktor
+帮我安装 Ducktor 插件：https://github.com/HKUSTDial/Ducktor
 照仓库里 INSTALL.md 的步骤装好，装完告诉我怎么开始用。
 ```
 
@@ -149,7 +149,7 @@ Ducktor 将过程中的认知资产以纯文本 Markdown 存储在项目本地�
 在终端中执行：
 
 ```bash
-claude plugin marketplace add yinwu01/Ducktor
+claude plugin marketplace add HKUSTDial/Ducktor
 claude plugin install duck@ducktor
 ```
 
@@ -158,7 +158,7 @@ claude plugin install duck@ducktor
 在终端中执行：
 
 ```bash
-codex plugin marketplace add yinwu01/Ducktor
+codex plugin marketplace add HKUSTDial/Ducktor
 codex plugin add duck@ducktor
 ```
 安装后，请在 Codex 中打开 `/hooks`，信任 Ducktor 注册的两条 Hook，随后开启新会话即可。
@@ -248,7 +248,7 @@ codex plugin add duck@ducktor
 * **核心方法论与技能库**：科研手册（`handbook/`）与 10 项底层科研技能（`library/`）源自香港科技大学（广州）数据智能与分析实验室开源的 [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)（Copyright © 2026 Yuyu Luo and contributors）。本仓库提交历史自上游 `c243997`（2026-07-01）分支演进，完整保留了上游历史提交与作者署名；`library/` 与 `handbook/` 内容同步自上游 `aff5de9`（2026-07-16）。
 * **示例数据说明**：README 演示图表中引用的对比实验数据，取自经典论文 *Attention Is All You Need*（[arXiv:1706.03762](https://arxiv.org/abs/1706.03762)）的 Table 2 与 Table 3。
 * **工程致谢**：README 的文档叙事受 [ponytail](https://github.com/DietrichGebert/ponytail)（MIT）启发；多平台 Agent Harness 的兼容架构参考了 `ponytail` 与 [superpowers](https://github.com/obra/superpowers)。
-* **Supervisor 系列**：我们正式将 Supervisor 作为一个实验室系列：[Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) 是系列的第一个，Ducktor 与 [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor) 是第二和第三个。接下来我们还会继续开源，并与社区合作。
+* **Supervisor 系列**：我们正式将 Supervisor 作为一个实验室系列：[Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) 是系列的第一个，Ducktor 与 [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor) 是第二和第三个。接下来我们还会继续开源，并与社区合作。
 
 ---
 

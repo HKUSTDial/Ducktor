@@ -30,7 +30,7 @@
 </p>
 
 <p align="center">
-  <img src="../assets/demo.webp" width="880" alt="An illustration, not a screen recording. Two terminals get the same task: “The experiments are done; results are in results/. Write it up as a NeurIPS paper.” On the left, without Ducktor, the AI quickly writes paper/main.tex and says it is done; it adds that, not to overclaim, the ablations ran once, so gaps of 0.1 to 0.3 get no conclusion. You get a paper. On the right, you first send /duck on to turn Ducktor on in this project: everyday work also gets the why and a decision log, and results are checked before they go into the paper. Then the same request. Ducktor reads the results, says it will write with /duck-write, and first asks: the ablations ran once and the 0.1 to 0.3 gaps were not compared with seed variation; add seeds first, or write first? You answer “You decide.” After writing, it explains why: write first, the ablations report numbers and draw no conclusion, so noise is not called a finding; each of the three claims maps to a section a reviewer can check. The decision line records three choices, all made by the AI. Then /duck-learn: it asks which step you decided and which you would redo; you skip. It gives the goal and what happened; what a top advisor checks is that a gap must beat seed variation (card E05, a built-in Ducktor card, not a paper), and the ablations ran once; it lists the judgments left to the AI, says you can ask to decide next time, and gives the next steps. The look-back goes into .duck/reports/ and the principle into the notebook. Last, /duck-why on the intro step: the part most worth learning is paragraph 2, which says what makes translation itself hard before giving the method, and maps each difficulty to a module (self-attention, positional encoding). Widom, Tips for Writing Technical Papers: the intro must say why it is hard. The principle “Map each difficulty to a module.” goes into the notebook, with what to do first next time. It ends by noting that the account of how it was done is inferred from the files and the conversation record. (The picture shows the 0.2.0 style. Since 0.2.1 the conversation names no authors and no card numbers, the look-back does not open with the same question, and sources go into the report.)">
+  <img src="../assets/demo.webp" width="880" alt="An illustration, not a screen recording. Headline: Agents do research; Ducktor learns it with you. Two terminals get the same request: “The experiments are done; results are in results/. Write it up as a NeurIPS paper.” On the left, without Ducktor, the AI writes paper/main.tex and adds that, to avoid overclaiming, the ablations ran once, so gaps of 0.1 to 0.3 get no conclusion. On the right, you first type /duck on: from then on it also explains why in ordinary work, records who decided, and runs three checks before results go into the paper. With the same request, the AI says it writes the whole paper with /duck-write and names the main weakness first: every number comes from one run, so a BLEU gap cannot be compared with seed variation; it writes the numbers as they are, without “significant”, and adds seeds if you agree. After writing, it gives one reason: base leads only on EN-DE, and on EN-FR its 38.1 is below every baseline; before writing a claim, look for the row that refutes it. Three decision lines say which choice you made and which the AI made. Then /duck-learn: the EN-FR sentence the AI wrote in the abstract is only 0.51 above 41.29, from a single run, so add seeds or write “on par”; the derived numbers were recomputed from results/ and match. Last, /duck-why on the intro step: paragraph 2, after the limits of RNNs and convolution, says what makes translation itself hard (distant words must connect), and self-attention answers it (paper/main.tex, line 49); the principle “State the problem’s difficulties first, and map each one to a module.” goes into the notebook.">
 </p>
 
 <p align="center">
@@ -59,14 +59,14 @@ The idea comes from <a href="https://en.wikipedia.org/wiki/Rubber_duck_debugging
 </details>
 
 > [!TIP]
-> **Using DeepSeek Harness?** Use [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor/blob/main/docs/README.en.md): the same commands and rules as Ducktor, adapted to the features of DeepSeek Harness.
+> **Using DeepSeek Harness?** Use [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor/blob/main/docs/README.en.md): the same commands and rules as Ducktor, adapted to the features of DeepSeek Harness.
 
 ---
 
 ## The core experience: before vs. after
 
 <p align="center">
-  <img src="../assets/before-after.png" width="880" alt="An illustration, not a screen recording. The same request: “The experiments are done. Results are in results/. Write a NeurIPS paper.” Headline: Agents do research; Ducktor learns it with you. Without Ducktor, the AI reads the results, writes paper/main.tex, and says it is done, without drawing a conclusion on gaps of 0.1 to 0.3. With Ducktor, the work goes through /duck-outline (card W08: a claim must matter if cut), /duck-write (card W13: no AI-made citations, highlighted and saved to the notebook) and /duck-review (card R02: split a big gain into its sources); each step gives the reason, a principle, and what to do first next time. (The picture shows the 0.2.0 style. Since 0.2.1 a principle and a next-time step come only when there is one, not at every step.)">
+  <img src="../assets/before-after.png" width="880" alt="An illustration, not a screen recording. Headline: Agents do research; Ducktor learns it with you. The same request: “The experiments are done; results are in results/. Write it up as a NeurIPS paper.” Without Ducktor, the AI reads the results, writes 335 lines to paper/main.tex, and says it is done. With Ducktor, three steps: /duck-outline says the contribution reads “attention only, no recurrence or convolution”, and cutting it changes the paper’s claim; /duck-write says the baseline training costs come from each paper and their methods may differ, so the paper says “estimated” and “about 2.9x”, and the principle “Match word strength to evidence.” goes into the notebook; /duck-review says big beats base by 1.1 BLEU on EN-DE, but the parameters, the steps and the dropout changed together, so you cannot tell which one gave the 1.1; next time, vary one factor per run.">
 </p>
 
 When you give your experimental results to a regular AI to write the paper, the AI produces a first draft in one pass. **How to state the core contribution, how strong the wording of a conclusion may be, whether the baselines are reasonable**: the model decides all of these by itself, inside a black box. You may get a fluent draft, but you miss the most important training in method, and you plant problems for the later review.
@@ -136,7 +136,7 @@ A project with Ducktor on loads the always-on rules [`rules/core.md`](../rules/c
 Let your agent help. Send it this message:
 
 ```text
-Install the Ducktor plugin for me: https://github.com/yinwu01/Ducktor
+Install the Ducktor plugin for me: https://github.com/HKUSTDial/Ducktor
 Follow the steps in i18n/INSTALL.en.md in that repository, then tell me how to start.
 ```
 
@@ -150,7 +150,7 @@ You can also install it yourself with the steps below.
 In a terminal:
 
 ```bash
-claude plugin marketplace add yinwu01/Ducktor
+claude plugin marketplace add HKUSTDial/Ducktor
 claude plugin install duck@ducktor
 ```
 
@@ -159,7 +159,7 @@ claude plugin install duck@ducktor
 In a terminal:
 
 ```bash
-codex plugin marketplace add yinwu01/Ducktor
+codex plugin marketplace add HKUSTDial/Ducktor
 codex plugin add duck@ducktor
 ```
 After the install, open `/hooks` in Codex, trust the two hooks that Ducktor registers, and then start a new session.
@@ -249,7 +249,7 @@ No. Ducktor gives no tests and does not grade the user. <code>/duck-idea</code> 
 * **Core method and skill library**: the research handbook (`handbook/`) and the 10 underlying research skills (`library/`) come from [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills), open-sourced by the Data Intelligence and Analytics Lab of the Hong Kong University of Science and Technology (Guangzhou) (Copyright © 2026 Yuyu Luo and contributors). The commit history of this repository grows from upstream `c243997` (2026-07-01) and keeps all upstream commits and authors; the content of `library/` and `handbook/` is synced from upstream `aff5de9` (2026-07-16).
 * **Example data**: the comparison numbers in the README images come from Table 2 and Table 3 of the classic paper *Attention Is All You Need* ([arXiv:1706.03762](https://arxiv.org/abs/1706.03762)).
 * **Engineering thanks**: the story of this README is inspired by [ponytail](https://github.com/DietrichGebert/ponytail) (MIT); the support for many agent harnesses follows `ponytail` and [superpowers](https://github.com/obra/superpowers).
-* **The Supervisor series**: we now officially make Supervisor a series of our lab. [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) is the first in the series, and Ducktor and [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor) are the second and the third. We will keep open-sourcing more work and collaborate with the community.
+* **The Supervisor series**: we now officially make Supervisor a series of our lab. [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) is the first in the series, and Ducktor and [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor) are the second and the third. We will keep open-sourcing more work and collaborate with the community.
 
 ---
 

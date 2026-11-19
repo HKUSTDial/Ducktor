@@ -215,10 +215,14 @@ test('an English config gets an English reminder to reply in English', () => {
 test('the injected text stays well under host limits', () => {
   // Claude Code caps additionalContext at 10,000 characters; Codex moves long context to a file.
   // Worst cases: on, the short-reply line (adds a sentence), an English config (adds one more),
-  // unreadable bytes (one more), and a config cut at its limit.
+  // unreadable bytes (one more), and a config cut at its limit. The plugin root path is counted
+  // as 100 characters wherever the tests run, so the result does not depend on the checkout's
+  // path. The limit went from 7000 to 7100 in 0.2.4 (user, 11-18), when core.md rule 1 and the
+  // stop-after-asking line gained a sentence each.
   for (const head of ['开关：on\n回复：短\n', 'Switch: on\nReply: short\n', 'Switch: on\nReply: short\n\uFFFD']) {
     const text = duck.buildContext(project({ '.duck/config.md': `${head}${'x'.repeat(5000)}` }));
-    assert.ok(text.length < 7000, `${text.length} characters`);
+    const length = text.split(ROOT).join('x'.repeat(100)).length;
+    assert.ok(length < 7100, `${length} characters`);
   }
 });
 
@@ -540,6 +544,25 @@ test('checkpoint lets an edit through in every case the design lists', () => {
   assert.equal(deny(editInput(on, path.join(on, 'code.py'))), false);
   assert.equal(deny(editInput(on, path.join(on, '.duck', 'notebook.md'))), false);
   assert.equal(deny(editInput(on, path.join(os.tmpdir(), 'elsewhere.md'))), false);
+});
+
+test('the edit reminder: what 0.2.4 added after the red team, in both languages', () => {
+  // User, 11-10 and 11-18. On DeepSeek-Ducktor the model took every refusal for a wrong edit and
+  // undid choices the student had left to it (persona 6 of 6, probe 3 of 3); in the holdout it
+  // edited nothing or only the literature review; answer hints came after the numbered questions;
+  // a small edit did not name /duck-polish although the model had read the reminder.
+  const zh = duck.checkpointReminder('开关：on\n');
+  const en = duck.checkpointReminder('Switch: on\n');
+  assert.match(zh, /不代表这次改得不对/);
+  assert.match(en, /does not mean that the edit was wrong/);
+  assert.match(zh, /「你定吧」[^\n]*就算定了[^\n]*AI 定/);
+  assert.match(en, /"you decide"[^\n]*it is decided[^\n]*AI decided/);
+  assert.match(zh, /学生要改的其余部分照常改完，包括这几句所在的那几节/);
+  assert.match(en, /including the sections that hold those sentences/);
+  assert.match(zh, /点出那条命令/);
+  assert.match(en, /names that command/);
+  assert.match(zh, /写在编号前面，编号后面不再写别的/);
+  assert.match(en, /go before the numbered list, and nothing comes after it/);
 });
 
 test('checkpoint: extensions, relative paths and Write of a new file', () => {

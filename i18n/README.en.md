@@ -59,7 +59,7 @@ The idea comes from <a href="https://en.wikipedia.org/wiki/Rubber_duck_debugging
 </details>
 
 > [!TIP]
-> **Using DeepSeek Harness?** Use [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor/blob/main/docs/README.en.md): the same commands and rules as Ducktor, adapted to the features of DeepSeek Harness.
+> **Using DeepSeek Harness?** Use [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor/blob/main/docs/README.en.md): the same commands and rules as Ducktor, adapted to the features of DeepSeek Harness.
 
 ---
 
@@ -136,7 +136,7 @@ A project with Ducktor on loads the always-on rules [`rules/core.md`](../rules/c
 Let your agent help. Send it this message:
 
 ```text
-Install the Ducktor plugin for me: https://github.com/yinwu01/Ducktor
+Install the Ducktor plugin for me: https://github.com/HKUSTDial/Ducktor
 Follow the steps in i18n/INSTALL.en.md in that repository, then tell me how to start.
 ```
 
@@ -150,7 +150,7 @@ You can also install it yourself with the steps below.
 In a terminal:
 
 ```bash
-claude plugin marketplace add yinwu01/Ducktor
+claude plugin marketplace add HKUSTDial/Ducktor
 claude plugin install duck@ducktor
 ```
 
@@ -159,7 +159,7 @@ claude plugin install duck@ducktor
 In a terminal:
 
 ```bash
-codex plugin marketplace add yinwu01/Ducktor
+codex plugin marketplace add HKUSTDial/Ducktor
 codex plugin add duck@ducktor
 ```
 After the install, open `/hooks` in Codex, trust the two hooks that Ducktor registers, and then start a new session.
@@ -248,7 +248,7 @@ No. Ducktor gives no tests and does not grade the user. <code>/duck-idea</code> 
 * **Core method and skill library**: the research handbook (`handbook/`) and the 10 underlying research skills (`library/`) come from [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills), open-sourced by the Data Intelligence and Analytics Lab of the Hong Kong University of Science and Technology (Guangzhou) (Copyright © 2026 Yuyu Luo and contributors). The commit history of this repository grows from upstream `c243997` (2026-07-01) and keeps all upstream commits and authors; the content of `library/` and `handbook/` is synced from upstream `aff5de9` (2026-07-16).
 * **Example data**: the comparison numbers in the README images come from Table 2 and Table 3 of the classic paper *Attention Is All You Need* ([arXiv:1706.03762](https://arxiv.org/abs/1706.03762)).
 * **Engineering thanks**: the story of this README is inspired by [ponytail](https://github.com/DietrichGebert/ponytail) (MIT); the support for many agent harnesses follows `ponytail` and [superpowers](https://github.com/obra/superpowers).
-* **The Supervisor series**: we now officially make Supervisor a series of our lab. [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) is the first in the series, and Ducktor and [DeepSeek-Ducktor](https://github.com/yinwu01/DeepSeek-Ducktor) are the second and the third. We will keep open-sourcing more work and collaborate with the community.
+* **The Supervisor series**: we now officially make Supervisor a series of our lab. [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) is the first in the series, and Ducktor and [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor) are the second and the third. We will keep open-sourcing more work and collaborate with the community.
 
 ---
 

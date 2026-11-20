@@ -1,12 +1,12 @@
 # Licenses by directory
 
 Ducktor is adapted from [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)
-(skills and handbook text taken at commit aff5de9, 2026-07-16), Copyright (c) 2026 Yuyu Luo (methodology) and contributors,
+(skills and handbook text taken at commit 4c71810, 2026-11-20), Copyright (c) 2026 Yuyu Luo (methodology) and contributors,
 licensed under CC BY-NC-SA 4.0.
 
 | Path | License | Notes |
 |---|---|---|
-| `library/<skill>/` | Each skill keeps its own license | CC-BY-4.0: benchmark-paper-template, figure-designer, idea-evaluator, pre-submission-reviewer, tech-paper-template, vibe-research-workflow. CC-BY-NC-SA-4.0: deep-research, intro-drafter, paper-polish, paper-writer. Files are unmodified copies. CC BY 4.0: see `CC-BY-4.0.txt` (the official legal code from https://creativecommons.org/licenses/by/4.0/legalcode.txt). |
+| `library/<skill>/` | CC-BY-NC-SA-4.0 | Unmodified copies of the 10 upstream skills, under the upstream `LICENSE`. See `CC-BY-NC-SA-4.0.txt`. Up to Supervisor-Skills 4c71810, the SKILL.md frontmatter of six of them still said `license: CC-BY-4.0`, left over from before the upstream license change in its 2.0.0; Ducktor up to 0.2.3 followed those lines. |
 | `handbook/` | CC-BY-NC-SA-4.0 | Unmodified copies of the handbook text. See `CC-BY-NC-SA-4.0.txt`. |
 | `skills/`, `rules/`, `cards/` | CC-BY-NC-SA-4.0 | Ducktor's own text, adapted from Supervisor-Skills. Not for commercial use. |
 | `bin/`, `hooks/`, `scripts/`, `tests/` (except `tests/fixtures/`) | MIT | Code. See `MIT.txt`. Code files read the text in `rules/` at run time and do not embed it. |
@@ -19,4 +19,4 @@ licensed under CC BY-NC-SA 4.0.
 | `LICENSE`, `LICENSES/` | The license texts | `LICENSE` is the short summary, and this file is the full map. The legal codes are copied unchanged. |
 
 `CC-BY-NC-SA-4.0.txt` is the upstream `LICENSE` file, copied unchanged. The full legal code is at
-https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode. `CC-BY-4.0.txt` is the CC BY 4.0 legal code, downloaded unchanged on 2026-10-28.
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.

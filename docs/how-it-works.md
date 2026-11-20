@@ -9,7 +9,7 @@
 hooks/  bin/duck.js     开场注入、读插件文件和追加记录的放行、改稿前的检查（Node，不装依赖）
 rules/                  常驻规则、命令模板、命令表
 skills/                 14 条命令
-library/                Supervisor-Skills 的 10 个原技能（上游提交 aff5de9），原样存放
+library/                Supervisor-Skills 的 10 个原技能（上游提交 4c71810），原样存放
 handbook/               科研导师手册的文字版（zh、en）
 cards/                  经验卡片 23 张，每张写明道理和出处；MENTORS.md 是名家文章索引
 scripts/  tests/        生成、同步上游、测试

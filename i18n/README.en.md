@@ -26,7 +26,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/works%20with-Codex%20%C2%B7%20Claude%20Code%20%C2%B7%20ZCode%20%C2%B7%20Gemini%20CLI%20%C2%B7%20Qwen%20Code%20%C2%B7%20CodeBuddy%20%C2%B7%20Cursor-007ec6?style=flat-square" alt="Works with Codex, Claude Code, ZCode, Gemini CLI, Qwen Code, CodeBuddy and Cursor">
-  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20%C2%B7%20CC%20BY--NC--SA%204.0%20%C2%B7%20CC%20BY%204.0-lightgrey?style=flat-square" alt="License: MIT, CC BY-NC-SA 4.0 and CC BY 4.0"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20%C2%B7%20CC%20BY--NC--SA%204.0-lightgrey?style=flat-square" alt="License: MIT and CC BY-NC-SA 4.0"></a>
 </p>
 
 <p align="center">
@@ -258,7 +258,7 @@ No. Ducktor gives no tests and does not grade the user. <code>/duck-idea</code> 
 This project uses different licenses for different folders:
 * **Method documents and visual assets**: the original rules and cards of this project (`skills/`, `rules/`, `cards/`), the research handbook (`handbook/`) and the images (`assets/`) use **CC BY-NC-SA 4.0** (non-commercial, share alike).
 * **Engineering code**: the scaffolding, hooks and test scripts (`bin/`, `hooks/`, `scripts/`, `tests/`) use **MIT**.
-* **Upstream skill library**: the research skills in `library/` keep their own upstream licenses (6 use **CC BY 4.0**, 4 use **CC BY-NC-SA 4.0**).
+* **Upstream skill library**: the 10 research skills in `library/` are unchanged copies from Supervisor-Skills and keep its **CC BY-NC-SA 4.0** license.
 
 For the full terms, see [LICENSE](../LICENSE) and [LICENSES/README.md](../LICENSES/README.md).
 

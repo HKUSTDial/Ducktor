@@ -26,7 +26,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/works%20with-Codex%20%C2%B7%20Claude%20Code%20%C2%B7%20ZCode%20%C2%B7%20Gemini%20CLI%20%C2%B7%20Qwen%20Code%20%C2%B7%20CodeBuddy%20%C2%B7%20Cursor-007ec6?style=flat-square" alt="Works with Codex, Claude Code, ZCode, Gemini CLI, Qwen Code, CodeBuddy and Cursor">
-  <a href="#许可证-license"><img src="https://img.shields.io/badge/license-MIT%20%C2%B7%20CC%20BY--NC--SA%204.0%20%C2%B7%20CC%20BY%204.0-lightgrey?style=flat-square" alt="License: MIT, CC BY-NC-SA 4.0 and CC BY 4.0"></a>
+  <a href="#许可证-license"><img src="https://img.shields.io/badge/license-MIT%20%C2%B7%20CC%20BY--NC--SA%204.0-lightgrey?style=flat-square" alt="License: MIT and CC BY-NC-SA 4.0"></a>
 </p>
 
 <p align="center">
@@ -257,7 +257,7 @@ codex plugin add duck@ducktor
 本项目采用分目录多重许可策略：
 * **方法论文档与视觉资产**：本项目原创的规则与卡片（`skills/`、`rules/`、`cards/`）、科研手册（`handbook/`）及配图资产（`assets/`）采用 **CC BY-NC-SA 4.0** 协议（非商业性使用-相同方式共享）。
 * **工程代码**：脚手架、Hook 与测试脚本（`bin/`、`hooks/`、`scripts/`、`tests/`）采用 **MIT** 协议。
-* **上游技能库**：`library/` 目录下的科研技能保留各自的上游许可证（其中 6 项采用 **CC BY 4.0**，4 项采用 **CC BY-NC-SA 4.0**）。
+* **上游技能库**：`library/` 目录下的 10 项科研技能原样拷贝自 Supervisor-Skills，沿用上游的 **CC BY-NC-SA 4.0** 协议。
 
 完整许可条款请参阅 [LICENSE](LICENSE) 与 [LICENSES/README.md](LICENSES/README.md)。
 

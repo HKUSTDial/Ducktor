@@ -245,7 +245,7 @@ codex plugin add duck@ducktor
 ## 来源与致谢
 
 * **命名灵感**：源自《程序员修炼之道》（*The Pragmatic Programmer*）提出的小黄鸭调试法（[Rubber Duck Debugging](https://en.wikipedia.org/wiki/Rubber_duck_debugging)）。
-* **核心方法论与技能库**：科研手册（`handbook/`）与 10 项底层科研技能（`library/`）源自香港科技大学（广州）数据智能与分析实验室开源的 [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)（Copyright © 2026 Yuyu Luo and contributors）。本仓库提交历史自上游 `c243997`（2026-07-01）分支演进，完整保留了上游历史提交与作者署名；`library/` 与 `handbook/` 内容同步自上游 `aff5de9`（2026-07-16）。
+* **核心方法论与技能库**：科研手册（`handbook/`）与 10 项底层科研技能（`library/`）源自香港科技大学（广州）数据智能与分析实验室开源的 [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)（Copyright © 2026 Yuyu Luo and contributors）。本仓库提交历史自上游 `c243997`（2026-07-01）分支演进，完整保留了上游历史提交与作者署名；`library/` 与 `handbook/` 内容同步自上游 `4c71810`（2026-11-20）。
 * **示例数据说明**：README 演示图表中引用的对比实验数据，取自经典论文 *Attention Is All You Need*（[arXiv:1706.03762](https://arxiv.org/abs/1706.03762)）的 Table 2 与 Table 3。
 * **工程致谢**：README 的文档叙事受 [ponytail](https://github.com/DietrichGebert/ponytail)（MIT）启发；多平台 Agent Harness 的兼容架构参考了 `ponytail` 与 [superpowers](https://github.com/obra/superpowers)。
 * **Supervisor 系列**：我们正式将 Supervisor 作为一个实验室系列：[Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) 是系列的第一个，Ducktor 与 [DeepSeek-Ducktor](https://github.com/HKUSTDial/DeepSeek-Ducktor) 是第二和第三个。接下来我们还会继续开源，并与社区合作。

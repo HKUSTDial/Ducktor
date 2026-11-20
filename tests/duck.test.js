@@ -557,8 +557,14 @@ test('the edit reminder: what 0.2.4 added after the red team, in both languages'
   assert.match(en, /does not mean that the edit was wrong/);
   assert.match(zh, /「你定吧」[^\n]*就算定了[^\n]*AI 定/);
   assert.match(en, /"you decide"[^\n]*it is decided[^\n]*AI decided/);
-  assert.match(zh, /学生要改的其余部分照常改完，包括这几句所在的那几节/);
-  assert.match(en, /including the sections that hold those sentences/);
+  assert.match(zh, /学生要改的其余部分照常改完：这几句所在的那几节也改，只是这几句不动/);
+  assert.match(en, /edit the sections that hold those sentences too, and leave only those sentences unchanged/);
+  // Round 4 (11-19): finishing the sections made the AI merge the two sides of a contradiction
+  // (holdout, 2 of 6 dropped one corpus) and write one-choice methods (marketing, dsh item 1 1/6).
+  assert.match(zh, /互相矛盾的两处都留着，不合并，不删其中一处/);
+  assert.match(en, /keep both places: do not merge them, do not delete one of them/);
+  assert.match(zh, /只适用于其中一种选择的做法不写进稿子；每一种选择下怎么做，写进回复最后的问题里/);
+  assert.match(en, /put what each choice would need into the questions at the end of the reply/);
   assert.match(zh, /点出那条命令/);
   assert.match(en, /names that command/);
   assert.match(zh, /写在编号前面，编号后面不再写别的/);

@@ -176,7 +176,8 @@ const reports = (suffix) => (fs.existsSync(duckFile('reports'))
 // count), so only phrases about having run once do (只跑过一次, 跑了 1 次), not 再跑一次 or advice
 // such as 就跑一次. Re-judged on every main run saved under evals/results/ of the Ducktor and
 // DeepSeek-Ducktor checkouts and worktrees (11-20), two verdicts changed: that dsh run now passes,
-// and the Codex main run of 10-18, which passed on 只计一次 in an unrelated line, now fails.
+// and the Codex main run of 10-18 05:08 (e2e-codex-2026-10-18T05-08-13), which passed on 只计一次
+// in an unrelated line, now fails.
 const RUN_WORDS = /seed|种子|单次|(?:只|仅)跑[了过]?\s*[1一]\s*次|跑[了过]\s*[1一]\s*次|一次运行|一次结果|几次|重复次数|方差|标准差/i;
 const THE_RESULT = /0\.8|71\.2|70\.4|removes noise|去噪/i;
 const tiesRunsToResult = (body) => String(body || '').split('\n').some((s) => RUN_WORDS.test(s) && THE_RESULT.test(s));

@@ -172,9 +172,10 @@ const reports = (suffix) => (fs.existsSync(duckFile('reports'))
 // the check read the reply only, for the words seed, 种子, 单次, 一次, 方差, 标准差 (dsh main, 11-09:
 // the reply said the paper does not state 跑几次, the report said 71.2 对 70.4 只跑一次, and the
 // check failed). A line about runs that does not name the result, such as a generic checklist
-// row, does not count. Re-judged with this check, 1 of 47 saved main runs changed: that dsh run,
-// which now passes.
-const RUN_WORDS = /seed|种子|单次|一次|几次|重复次数|方差|标准差/i;
+// row, does not count. A bare 一次 is too wide (red team round 2: 再看一次 next to 去噪 would
+// count), so only phrases about one run do. Re-judged with this check, 1 of 53 saved main runs
+// changed: that dsh run, which now passes.
+const RUN_WORDS = /seed|种子|单次|只跑一次|跑了一次|一次运行|一次结果|几次|重复次数|方差|标准差/i;
 const THE_RESULT = /0\.8|71\.2|70\.4|removes noise|去噪/i;
 const tiesRunsToResult = (body) => String(body || '').split('\n').some((s) => RUN_WORDS.test(s) && THE_RESULT.test(s));
 const allReports = () => (fs.existsSync(duckFile('reports')) ? fs.readdirSync(duckFile('reports')) : []);

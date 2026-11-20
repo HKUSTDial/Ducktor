@@ -7,7 +7,12 @@
 //   allow          PreToolUse in Claude Code: let it read the plugin's own files (library/,
 //                  cards/, handbook/ ...) and add to the records Ducktor keeps in the project's
 //                  .duck/ (notebook, decisions, reports) without a permission prompt; anything
-//                  else gets no answer, so the host asks as usual
+//                  else gets no answer, so the host asks as usual. Also the edit checkpoint
+//                  (Claude Code only for now): the first edit of a text draft in a turn is refused
+//                  once, with the reminder in rules/checkpoint.md. Codex stays off until its
+//                  probes pass; turning it on takes DUCK_CODEX_CHECKPOINT=1 here, apply_patch in
+//                  the PreToolUse matcher of hooks/claude-codex-hooks.json, and trusting the
+//                  changed hook again in Codex's /hooks
 // Rule text stays in rules/ (or the student's copy in .duck/skills/), never in this file.
 'use strict';
 
@@ -348,12 +353,242 @@ function allowRecord(input) {
   }));
 }
 
+// ---------------------------------------------------------------------------------------
+// Edit checkpoint (0.2.4). In a project with the switch on or quiet, the first edit of a text
+// draft in each turn is refused once, with the reminder from rules/checkpoint.md: undecided
+// research decisions stay as the draft has them and are listed for the student. On 11-05 the
+// model wrote such decisions into the draft before asking in 4 of 5 re-tests, although
+// rules/core.md says to list them; a reminder at the moment of editing is the remedy chosen
+// (design: agent-hosts/ducktor/out/design-0.2.4/DESIGN.md). The other text-draft edits sent in
+// the same batch are refused too, so none lands before the reminder is read (sameBatch below;
+// the 11-09 e2e found the batch edits writing the decision). Every doubt lets the edit through.
+
+const TEXT_DRAFT = new Set(['.md', '.tex', '.txt', '.rst', '.typ', '.org', '.qmd', '.rmd']);
+// Session and turn ids go into a file name joined by "--", so an id may not hold "--" itself.
+// Without a usable session id the turn cannot be told apart from other sessions: let through.
+const SAFE_ID = /^(?!.*--)[\w.-]{1,128}$/;
+const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit'];
+
+// Paths an apply_patch command touches: Update, Add and Delete lines, and the new path of a move.
+function patchPaths(command) {
+  if (typeof command !== 'string') return [];
+  const out = [];
+  for (const m of command.matchAll(/^\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)\s*$/gm)) out.push(m[1]);
+  return out;
+}
+
+// True for a file inside the project, outside .duck/, with a text-draft extension.
+function isTextDraft(file, project) {
+  if (typeof file !== 'string' || !file || !project) return false;
+  if (!TEXT_DRAFT.has(path.extname(file).toLowerCase())) return false;
+  const root = realPathOf(path.resolve(project));
+  const real = realPathOf(path.resolve(file));
+  if (!root || !real) return false;
+  const rel = path.relative(root, real);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+  return rel.split(path.sep)[0] !== '.duck';
+}
+
+// The decision without any file I/O except reading paths. Returns 'allow' or 'claim': claim
+// means the caller should try to create this turn's record and refuse when that succeeds.
+// facts: { mode, isSubagent, session, turn, cwd, project, files }.
+function checkpointDecision(facts) {
+  if (facts.mode !== 'on' && facts.mode !== 'quiet') return 'allow';
+  if (facts.isSubagent) return 'allow';
+  if (!SAFE_ID.test(String(facts.session || '')) || !SAFE_ID.test(String(facts.turn || ''))) return 'allow';
+  const base = facts.cwd || facts.project;
+  const files = (facts.files || []).filter((f) => typeof f === 'string' && f);
+  if (files.some((f) => !path.isAbsolute(f)) && !base) return 'allow';
+  if (!files.some((f) => isTextDraft(path.resolve(base || '/', f), facts.project))) return 'allow';
+  return 'claim';
+}
+
+// Where the turn records and the test log live. CLAUDE_PLUGIN_DATA when the host sets it
+// (Claude Code and Codex); otherwise $XDG_STATE_HOME/ducktor, or ~/.local/state/ducktor.
+function checkpointDir(env = process.env) {
+  if (env.CLAUDE_PLUGIN_DATA) return path.join(env.CLAUDE_PLUGIN_DATA, 'checkpoint');
+  const state = env.XDG_STATE_HOME || path.join(env.HOME || require('os').homedir(), '.local', 'state');
+  return path.join(state, 'ducktor', 'checkpoint');
+}
+
+// Creates this turn's record with the given content. 'created' when this call created it,
+// 'exists' when an earlier call of the turn did, 'error' when anything else fails (the edit is
+// then let through).
+function claimTurn(dir, key, content = '') {
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // A folder another user made, or one others can write to, could be used to fake records.
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) return 'error';
+    const c = fs.constants;
+    let fd;
+    try {
+      fd = fs.openSync(path.join(dir, key), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600);
+    } catch (err) {
+      return err && err.code === 'EEXIST' ? 'exists' : 'error';
+    }
+    try { fs.writeSync(fd, content); } finally { fs.closeSync(fd); }
+    return 'created';
+  } catch (err) {
+    return 'error';
+  }
+}
+
+// Claude Code sends several edits in one message and runs them one after another before the
+// model reads any result, so the edits sent with the refused one would land before the reminder
+// is read. Its transcript gets the refused call only after the whole batch has run (probe of
+// 11-09), so an edit of the same turn that comes while the transcript does not hold the refused
+// call yet belongs to that batch and is refused too. Two limits keep a host that writes its
+// transcript differently from refusing a whole turn: two minutes after the first refusal, and
+// eight refusals in the batch besides the first one (nine in a turn). Anything unexpected lets
+// the edit through.
+const BATCH_MS = 120 * 1000;
+const BATCH_MAX = 8;
+const CALL_ID = /^[\w-]{1,128}$/;
+
+// The last max bytes of a file as text, or null when it cannot be read.
+function readTail(file, max) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, max);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    return buf.toString('utf8');
+  } catch (err) {
+    return null;
+  } finally {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch (err) { /* closed */ }
+  }
+}
+
+// True when this edit belongs to the batch of the turn's first refused edit (see above).
+function sameBatch(dir, key, input, now = Date.now()) {
+  try {
+    const c = fs.constants;
+    const fd = fs.openSync(path.join(dir, key), c.O_RDONLY | c.O_NOFOLLOW);
+    let rec;
+    try { rec = JSON.parse(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); }
+    const first = rec && typeof rec.first === 'string' && CALL_ID.test(rec.first) ? rec.first : '';
+    if (!first || typeof rec.t !== 'number' || now < rec.t || now - rec.t > BATCH_MS) return false;
+    if (typeof input.tool_use_id !== 'string' || !CALL_ID.test(input.tool_use_id) || input.tool_use_id === first) return false;
+    const transcript = input.transcript_path;
+    if (typeof transcript !== 'string' || !path.isAbsolute(transcript)) return false;
+    const text = readTail(transcript, 8 * 1024 * 1024);
+    if (text === null || text.includes(first)) return false;
+    // One marker file per refusal of the batch, so the count survives across hook processes.
+    const prefix = `${key}.b`;
+    if (fs.readdirSync(dir).filter((n) => n.startsWith(prefix)).length >= BATCH_MAX) return false;
+    fs.closeSync(fs.openSync(path.join(dir, `${prefix}${input.tool_use_id}`), c.O_WRONLY | c.O_CREAT | c.O_EXCL | c.O_NOFOLLOW, 0o600));
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// One line of the test log, only when checkpoint/LOG exists. A failure here changes nothing.
+function writeCheckpointLog(dir, entry, root = ROOT) {
+  try {
+    if (!fs.existsSync(path.join(dir, 'LOG'))) return;
+    let build = 'unknown';
+    try { build = fs.readFileSync(path.join(root, 'BUILD'), 'utf8').trim() || 'unknown'; } catch (err) { /* none */ }
+    const c = fs.constants;
+    const fd = fs.openSync(path.join(dir, 'log.txt'), c.O_WRONLY | c.O_CREAT | c.O_APPEND | c.O_NOFOLLOW, 0o600);
+    try {
+      fs.writeSync(fd, `${JSON.stringify({ ...entry, time: new Date().toISOString(), build })}\n`);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (err) { /* the test log is optional */ }
+}
+
+// Removes turn records older than seven days. LOG and log.txt stay.
+function pruneCheckpoint(dir, now = Date.now()) {
+  let names;
+  try { names = fs.readdirSync(dir); } catch (err) { return; }
+  for (const name of names) {
+    if (name === 'LOG' || name === 'log.txt') continue;
+    try {
+      const file = path.join(dir, name);
+      const stat = fs.lstatSync(file);
+      if (stat.isFile() && now - stat.mtimeMs > 7 * 24 * 3600 * 1000) fs.unlinkSync(file);
+    } catch (err) { /* another session removed it, or it is not ours: skip */ }
+  }
+}
+
+// The reminder from rules/checkpoint.md: the English section when the config is in English;
+// '' when the file or the section is missing (the checkpoint then lets the edit through).
+function checkpointReminder(config, root = ROOT) {
+  const text = readText(path.join(root, 'rules', 'checkpoint.md')) || '';
+  const english = typeof config === 'string' && ENGLISH_CONFIG.test(config);
+  const section = sectionOf(text, english ? /^##[ \t]*English[ \t]*$/m : /^##[ \t]*中文[ \t]*$/m)
+    .replace(/^##.*\n+/, '').trim();
+  return section;
+}
+
+// PreToolUse for Write, Edit, MultiEdit (Claude Code) and apply_patch (Codex). Prints a deny
+// and returns true when it refuses; returns false otherwise, printing nothing.
+function checkpoint(input) {
+  const toolInput = input.tool_input || {};
+  const project = [process.env.CLAUDE_PROJECT_DIR, input.cwd].find((p) => typeof p === 'string' && p);
+  const host = input.tool_name === 'apply_patch' ? 'codex' : 'claude-code';
+  if (!project) {
+    writeCheckpointLog(checkpointDir(), { host, session: String(input.session_id || ''), turn: '', tool: input.tool_name, subagent: false, decision: 'allow' });
+    return false;
+  }
+  const config = readText(path.join(project, '.duck', 'config.md'));
+  const files = input.tool_name === 'apply_patch' ? patchPaths(toolInput.command) : [toolInput.file_path];
+  const facts = {
+    mode: modeOf(config).mode,
+    isSubagent: typeof input.agent_id === 'string' && input.agent_id !== '',
+    session: input.session_id,
+    turn: host === 'codex' ? input.turn_id : input.prompt_id,
+    cwd: typeof input.cwd === 'string' ? input.cwd : '',
+    project,
+    files,
+  };
+  const dir = checkpointDir();
+  const reminder = checkpointReminder(config);
+  let decision = reminder ? checkpointDecision(facts) : 'allow';
+  let batch = false;
+  if (decision === 'claim') {
+    const key = `${facts.session}--${facts.turn}`;
+    const first = typeof input.tool_use_id === 'string' && CALL_ID.test(input.tool_use_id) ? input.tool_use_id : '';
+    const claim = claimTurn(dir, key, JSON.stringify({ first, t: Date.now() }));
+    if (claim === 'created') decision = 'deny';
+    else if (claim === 'exists' && sameBatch(dir, key, input)) { decision = 'deny'; batch = true; }
+    else decision = 'allow';
+  }
+  writeCheckpointLog(dir, { host, session: String(facts.session || ''), turn: String(facts.turn || ''), tool: input.tool_name, subagent: facts.isSubagent, decision, batch });
+  if (decision !== 'deny') return false;
+  fs.writeSync(1, JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reminder,
+    },
+  }));
+  return true;
+}
+
 function main(command) {
   // allow-read is the name the hooks file used before writes were added.
   if (command === 'allow' || command === 'allow-read') {
     try {
       const input = readInput();
-      if (['Write', 'Edit', 'MultiEdit'].includes(input.tool_name)) allowRecord(input);
+      if (EDIT_TOOLS.includes(input.tool_name)) {
+        // A checkpoint that throws refuses nothing: the record rules still apply.
+        let refused = false;
+        try { refused = checkpoint(input); } catch (err) { refused = false; }
+        if (!refused) allowRecord(input);
+      } else if (input.tool_name === 'apply_patch') {
+        // Codex goes through the checkpoint only after its probes pass (0.2.4 design, choice 6).
+        // Until then the probes and the tests turn it on with DUCK_CODEX_CHECKPOINT=1. The shipped
+        // hooks file does not send apply_patch here yet (its PreToolUse matcher lacks it), so this
+        // branch also needs that matcher before Codex users get the check.
+        if (process.env.DUCK_CODEX_CHECKPOINT === '1') checkpoint(input);
+      }
       else if (input.tool_name === 'Bash') refuseShellLogWrite(input);
       else allowRead(input);
     } catch (err) { /* stay silent: the host asks as usual */ }
@@ -361,7 +596,10 @@ function main(command) {
   }
   let context = '';
   try {
-    if (command === 'session-start') context = sessionStart();
+    if (command === 'session-start') {
+      pruneCheckpoint(checkpointDir());
+      context = sessionStart();
+    }
   } catch (err) {
     context = `Ducktor 插件根目录：${ROOT}\n\n（开场脚本出错，常驻规则这次没加载：${err.message}）`;
   }
@@ -375,6 +613,10 @@ function main(command) {
   fs.writeSync(1, JSON.stringify(output));
 }
 
-module.exports = { main, modeOf, buildContext, insideRoot, ROOT };
+module.exports = {
+  main, modeOf, buildContext, insideRoot, ROOT,
+  // Edit checkpoint, also used by DeepSeek-Ducktor.
+  patchPaths, isTextDraft, checkpointDecision, checkpointDir, claimTurn, sameBatch, writeCheckpointLog, pruneCheckpoint, checkpointReminder,
+};
 
 if (require.main === module) main(process.argv[2]);

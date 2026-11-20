@@ -92,14 +92,29 @@ function runCodex(prompt, session, opts = {}) {
 
 // Normalizes one host transcript into { session, reply, reads, tools, injected, cost }.
 function parse(stdout) {
-  const t = { session: null, reply: '', reads: [], tools: [], denials: [], refusedLogWrites: 0, injected: '', cost: 0, errors: [] };
+  const t = { session: null, reply: '', reads: [], tools: [], denials: [], refusedLogWrites: 0, checkpointRefusals: 0, guardRefusals: 0, injected: '', cost: 0, errors: [] };
   const texts = [];
+  // Ids of the error results that carry the checkpoint's reminder or the record guard's reason;
+  // only the ones the host also lists as denied are counted (a Read of rules/checkpoint.md carries
+  // the reminder text too, and is no refusal).
+  const checkpointIds = new Set();
+  const guardIds = new Set();
   for (const line of stdout.split('\n')) {
     let ev;
     try { ev = JSON.parse(line); } catch (err) { continue; }
     if (HOST === 'claude') {
       if (ev.type === 'system' && ev.session_id) t.session = ev.session_id;
       if (ev.type === 'system' && ev.subtype === 'hook_response') t.injected += String(ev.output || ev.stdout || '');
+      // The edit checkpoint's refusal comes back as a tool result that carries the reminder; the
+      // record guard's refusal of a whole Write over notebook.md or decisions.md, as one with its reason.
+      if (ev.type === 'user' && Array.isArray(ev.message?.content)) {
+        for (const c of ev.message.content) {
+          const body = c && c.type === 'tool_result' ? (Array.isArray(c.content) ? c.content.map((x) => x.text || '').join(' ') : String(c.content || '')) : '';
+          if (!c || !c.is_error) continue;
+          if (CHECKPOINT_MARK.test(body)) checkpointIds.add(c.tool_use_id);
+          else if (REWRITE_GUARD_MARK.test(body)) guardIds.add(c.tool_use_id);
+        }
+      }
       if (ev.type === 'assistant') {
         for (const c of ev.message.content || []) {
           if (c.type === 'text' && c.text.trim()) texts.push(c.text);
@@ -109,7 +124,7 @@ function parse(stdout) {
         }
       }
       // The student sees every message of the turn, not only the last one in `result`.
-      if (ev.type === 'result') { t.reply = texts.length ? texts.join('\n\n') : (ev.result || ''); t.cost = ev.total_cost_usd || 0; t.session = ev.session_id || t.session; t.denials = (ev.permission_denials || []).map((d) => `${d.tool_name} ${JSON.stringify(d.tool_input || {}).slice(0, 120)}`); t.refusedLogWrites = (ev.permission_denials || []).filter((d) => d.tool_name === 'Bash' && LOG_WRITE.test(String((d.tool_input || {}).command || ''))).length; }
+      if (ev.type === 'result') { t.reply = texts.length ? texts.join('\n\n') : (ev.result || ''); t.cost = ev.total_cost_usd || 0; t.session = ev.session_id || t.session; t.denials = (ev.permission_denials || []).map((d) => `${d.tool_name} ${JSON.stringify(d.tool_input || {}).slice(0, 120)}`); t.refusedLogWrites = (ev.permission_denials || []).filter((d) => d.tool_name === 'Bash' && LOG_WRITE.test(String((d.tool_input || {}).command || ''))).length; t.checkpointRefusals = (ev.permission_denials || []).filter((d) => checkpointIds.has(d.tool_use_id)).length; t.guardRefusals = (ev.permission_denials || []).filter((d) => guardIds.has(d.tool_use_id)).length; }
     } else {
       if (ev.type === 'thread.started') t.session = ev.thread_id;
       const it = ev.item || {};
@@ -151,6 +166,21 @@ const exists = (rel) => fs.existsSync(duckFile(rel));
 const text = (rel) => (exists(rel) ? fs.readFileSync(duckFile(rel), 'utf8') : '');
 const reports = (suffix) => (fs.existsSync(duckFile('reports'))
   ? fs.readdirSync(duckFile('reports')).filter((f) => f.endsWith(`${suffix}.md`) || f.includes(`${suffix}-`)) : []);
+// The fixture's 0.8-point gain (71.2 against 70.4) comes from one run: notes.md says so, the paper
+// says nothing about runs. A review catches it when one line of the reply or of the review report
+// (a bullet or a table row) ties that result to the number of runs or their spread. Until 0.2.4
+// the check read the reply only, for the words seed, 种子, 单次, 一次, 方差, 标准差 (dsh main, 11-09:
+// the reply said the paper does not state 跑几次, the report said 71.2 对 70.4 只跑一次, and the
+// check failed). A line about runs that does not name the result, such as a generic checklist
+// row, does not count. A bare 一次 is too wide (red team round 2: 再看一次 next to 去噪 would
+// count), so only phrases about having run once do (只跑过一次, 跑了 1 次), not 再跑一次 or advice
+// such as 就跑一次. Re-judged on every main run saved under evals/results/ of the Ducktor and
+// DeepSeek-Ducktor checkouts and worktrees (11-20), two verdicts changed: that dsh run now passes,
+// and the Codex main run of 10-18 05:08 (e2e-codex-2026-10-18T05-08-13), which passed on 只计一次
+// in an unrelated line, now fails.
+const RUN_WORDS = /seed|种子|单次|(?:只|仅)跑[了过]?\s*[1一]\s*次|跑[了过]\s*[1一]\s*次|一次运行|一次结果|几次|重复次数|方差|标准差/i;
+const THE_RESULT = /0\.8|71\.2|70\.4|removes noise|去噪/i;
+const tiesRunsToResult = (body) => String(body || '').split('\n').some((s) => RUN_WORDS.test(s) && THE_RESULT.test(s));
 const allReports = () => (fs.existsSync(duckFile('reports')) ? fs.readdirSync(duckFile('reports')) : []);
 // Read the original skill in this stage, or earlier in the same host session (its text is still in context).
 // A shell read after cd (`cd …/library/<skill> && cat SKILL.md`, DeepSeek on 0.2.2) counts too.
@@ -277,6 +307,8 @@ const principleOf = (l) => l.split('｜')[1] || l;
 // 「最小测试」「小测试」are test runs, not a quiz.
 // 「先小测、再全量」 plans a small experiment run, not a quiz (11-04 rc11, DeepSeek more).
 // A shell command that writes .duck/notebook.md or .duck/decisions.md (bin/duck.js refuses these).
+const CHECKPOINT_MARK = /Ducktor 插件的自动检查|Automatic check by the Ducktor plugin/;
+const REWRITE_GUARD_MARK = /keeps the student's earlier entries and this Write would replace them/;
 const LOG_WRITE = /(>>?|\btee\b|\b(sed|perl)\b[^|;&]*\s-[a-zA-Z]*i)[^|;&]*\.duck\/(notebook|decisions)\.md/;
 const QUIZ = /考考你|(给你|出个|出一道|来个|做个|做一次)小测|小测(一下|题)|测验|测一测|思考题|练习题|课后作业|留个作业|布置.{0,4}作业|给你打分|打几分|你的得分|成长档案/;
 // /duck-why talks like a mentor and grounds the lesson in named researchers. Names and views may
@@ -444,7 +476,7 @@ function mainStages() {
     { name: 'review', resume: true, prompt: `${cmd('duck-review')} paper/main.tex`, checks: [
       ['must', 'read library/pre-submission-reviewer', (t) => readOf(t, 'pre-submission-reviewer')],
       ['must', 'wrote a review report', () => reports('review').length > 0],
-      ['must', 'caught the single-run claim', (t) => /seed|种子|单次|一次|方差|标准差/.test(t.reply)],
+      ['must', 'caught the single-run claim', (t) => tiesRunsToResult(t.reply) || reports('review').some((f) => tiesRunsToResult(text(`reports/${f}`)))],
       ['should', 'caught the em-dash', (t) => /em-dash|破折号|em dash/i.test(t.reply)],
       ...shortWhyChecks(),
     ] },
@@ -804,9 +836,12 @@ function globalChecks(transcripts) {
     // commands). Claude Code 2.1.318 has no Glob or Grep tool, so simple read-only commands are
     // fine; loops, awk, python and cd in a compound command are not.
     // The hook's own refusal of a shell write to a log is listed as a denial too, but no prompt
-    // reaches the student for it (rc12 loop: the only denial of one run was that).
+    // reaches the student for it (rc12 loop: the only denial of one run was that). So is the edit
+    // checkpoint's refusal of a turn's first text-draft edit (0.2.4): the student sees the refusal
+    // line, not an approval prompt (11-09 regression, main: propose). Nor is the refusal of a whole
+    // Write over notebook.md or decisions.md: the model is told to Read and Edit (11-09 probe).
     ['should', 'no tool call needed the student\'s approval', () => HOST !== 'claude'
-      || transcripts.every((t) => (t.denials || []).length === (t.refusedLogWrites || 0))],
+      || transcripts.every((t) => (t.denials || []).length === (t.refusedLogWrites || 0) + (t.checkpointRefusals || 0) + (t.guardRefusals || 0))],
     // The short why names cards by title; a bare card number is jargon the student cannot read.
     ['should', 'no card number on its own in a short why', () => transcripts.map((t) => lastWhy(t.reply)).every((w) => !bareCardId(w))],
     // Most notebook lines are written by the AI; quoting one as the student's own is wrong.
@@ -903,7 +938,7 @@ function main() {
       const again = HOST === 'claude' ? runClaude(answer, session, opts) : runCodex(answer, session, opts);
       fs.writeFileSync(path.join(OUT, `${String(results.length + 1).padStart(2, '0')}-${stage.name}-followup.jsonl`), again.stdout || '');
       const t2 = parse(again.stdout || '');
-      t = { ...t2, injected: `${t.injected}\n${t2.injected}`, reads: [...t.reads, ...t2.reads], tools: [...t.tools, ...t2.tools], denials: [...(t.denials || []), ...(t2.denials || [])], refusedLogWrites: (t.refusedLogWrites || 0) + (t2.refusedLogWrites || 0), reply: `${t.reply}\n\n[学生] ${answer}\n\n${t2.reply}`, cost: t2.cost, sessionId: t.sessionId, earlierReads: t.earlierReads };
+      t = { ...t2, injected: `${t.injected}\n${t2.injected}`, reads: [...t.reads, ...t2.reads], tools: [...t.tools, ...t2.tools], denials: [...(t.denials || []), ...(t2.denials || [])], refusedLogWrites: (t.refusedLogWrites || 0) + (t2.refusedLogWrites || 0), checkpointRefusals: (t.checkpointRefusals || 0) + (t2.checkpointRefusals || 0), guardRefusals: (t.guardRefusals || 0) + (t2.guardRefusals || 0), reply: `${t.reply}\n\n[学生] ${answer}\n\n${t2.reply}`, cost: t2.cost, sessionId: t.sessionId, earlierReads: t.earlierReads };
       if (HOST === 'codex') t.injected = codexInjected(session);
       checks = evaluate(t);
     }

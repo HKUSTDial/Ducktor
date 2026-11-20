@@ -42,7 +42,7 @@ Cursor, Gemini CLI, and Qwen Code have adapter files, but we did not test them o
 ## How to make sure that it works
 
 1. Start a new session and type `/duck` (in Codex, `$duck:duck`). It first tells you the easiest way to use it. Then it shows 13 commands (14 with `/duck`), and it tells you that Ducktor is not on in this project yet. If you typed nothing else before `/duck`, it looks at your own notes and at `.duck/`: when they are in English, the menu is in English; otherwise (for example, in a new empty folder) the menu is in Chinese with one line in English. Your paper and README do not count, because many students write papers in English. The other commands work the same way when a command is the first thing you type: with no English notes or `.duck/` yet, the answer is in Chinese. Write to it in English, and it answers in English.
-2. In a project, type `/duck on`. The file `.duck/config.md` appears in the project, and its switch line says on. From that turn, Ducktor also follows your normal work. If you type `/duck off` or delete that line, Ducktor goes back to the default: it is silent during normal work and explains only when you type a command.
+2. In a project, type `/duck on`. The file `.duck/config.md` appears in the project, and its switch line says on. The reply and config.md use the language that step 1 describes. In English, the switch line reads `Switch: on`, and the reminder that the plugin gives the AI before an edit (FAQ 3 in the README) is in English too. From that turn, Ducktor also follows your normal work. If you type `/duck off` or delete that line, Ducktor goes back to the default: it is silent during normal work and explains only when you type a command.
 
 ## If you installed Doctor Duck
 

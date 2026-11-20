@@ -16,7 +16,7 @@ licensed under CC BY-NC-SA 4.0.
 | `assets/` | CC-BY-NC-SA-4.0 | The logo and the README images. The README images are illustrations, not screen recordings. Their paper numbers come from Tables 2 and 3 of arXiv 1706.03762. |
 | `library/upstream.lock.json`, `package.json`, `gemini-extension.json`, `.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, `.agents/`, `.github/`, `.gitignore` | MIT | Manifests and configuration. |
 | `docs/` | CC-BY-NC-SA-4.0 | Ducktor's design notes and research. Passages quoted from third-party guides and documentation remain under their authors' terms. |
-| `LICENSE`, `LICENSES/` | The license texts | `LICENSE` is the short summary, and this file is the full map. The license files are copied unchanged. |
+| `LICENSE`, `LICENSES/` | The license texts | `LICENSE` is the short summary, and this file is the full map. |
 
 `CC-BY-NC-SA-4.0.txt` is the upstream `LICENSE` file, copied unchanged. The full legal code is at
 https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.

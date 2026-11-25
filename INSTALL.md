@@ -60,7 +60,11 @@ Codex 里是 `codex plugin remove duck@doctor-duck` 和 `codex plugin marketplac
 - **`marketplace add` 卡住、超时或者拉取失败**：git 要能连上 GitHub。需要代理的网络里，先给 git 设好代理（`git config --global http.proxy http://地址:端口`，或者设 `HTTPS_PROXY` 环境变量）再装。Claude Code 报 `Git clone timed out` 时，设环境变量 `CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS=300000`（等 5 分钟）再试。Codex 的 `marketplace add`、`marketplace upgrade` 也要 git 连得上 GitHub，失败了设好代理再跑一次。
 - **每次开会话（Claude Code 里还有每次读写文件）都看到一条 hook 报错**：多半是没装 Node（`node: command not found`）。命令照样能用，只是开启了的项目也没有常驻规则；Claude Code 里读插件文件时还会多弹几次询问。装上 Node 就好。
 - **Claude Code 里命令跑起来一直问能不能读某个 `library/` 文件**：说明放行的 hook 没跑。看看是不是关掉了全部 hook（设置里的 `disableAllHooks`），或者没装 Node。
-- **Codex 里 AI 写不了 `.duck/` 下的文件，或者每条 shell 命令都失败**：看报错里有没有 `bwrap: Unexpected capabilities`。有的话是机器环境的问题，和插件无关：Codex 进程带着 ambient capabilities，有些版本的 bubblewrap（比如 0.6.1）因此不肯启动。用 `setpriv --inh-caps=-all --ambient-caps=-all codex` 启动 Codex。
+- **Codex 里 AI 写不了 `.duck/` 下的文件，或者每条 shell 命令都失败**：先看报错。每条 shell 命令都报 `bwrap: Unexpected capabilities` 时，看下面第一条。报 `patch rejected: writing is blocked by read-only sandbox`，是 Codex 开在只读模式，用 `/permissions` 换成能写项目的模式。报 `writing outside of the project`，或者报错里的路径不在你的项目里，请提 issue。报 `Failed to write file <路径>`，是 Codex 改文件的工具（apply_patch）被系统拒绝了，这句报错不带原因，Ducktor 也不拦这一步。这时在同一个会话里让 AI 跑一次 `touch .duck/reports/probe.txt`（跑完删掉；弹出授权框时选拒绝，不让它到沙箱外重跑），按 shell 报的错处理：
+  - `bwrap: Unexpected capabilities`（每条 shell 命令都这样报）：Codex 进程带着 ambient capabilities，有些版本的 bubblewrap（比如 0.6.1）因此不肯启动。用 `setpriv --inh-caps=-all --ambient-caps=-all codex` 启动 Codex。
+  - `Permission denied`：你现在的用户没有写权限。用 `ls -la .duck .duck/reports` 看属主和权限。属主是你时，用 chmod 改；属主不是你时，要用 sudo chown，或者请建这些文件的人改。
+  - `Read-only file system`：文件实际在 Codex 允许写的范围以外，比如 `.duck` 是指到项目外面的软链接。用 `codex --add-dir <实际位置>` 启动 Codex，或者把 `.duck` 换成项目里的真文件夹。
+  - touch 成功，或者报的是别的错：可能只有 `.duck/decisions.md` 这一个文件只读（touch 测不出来，看 `ls -la` 的结果），也可能是别的原因。请提 issue，附上那行报错和 touch 的输出。
 - **`/duck-review` 叫不出来，或者叫到了别的东西**：用插件命令的全名 `/duck:duck-review`。
 - **第一次跑 `/duck-survey` 弹了好几次授权**：Claude Code 第一次用 WebSearch、WebFetch 上网查文献时会问你。点允许；选了不再询问，以后就不问了。
 - **Claude Code 里改开关时问能不能改 `.duck/config.md`**：正常。`.duck/` 建好以后，往笔记本、决策记录里追加和写报告由插件放行，不弹窗；默认权限模式下，改已有的行、改开关和规则文件要你点头。AI 用 Write 整份写笔记本或决策记录、又没留下原来的条目时，插件直接拒绝，让 AI 先读、再在末尾追加；AI 用 shell 命令（echo 加 >> 这类）写这两个文件、命令里写明了 `.duck/` 下的路径时，插件也拒绝，让它改用编辑工具，这样不弹框；先 cd 进 `.duck/` 再写、用 python 写这类还拦不住。

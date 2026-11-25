@@ -31,7 +31,7 @@ codex plugin add duck@ducktor
 
 Then open Codex. In `/hooks`, trust the two Ducktor hooks. The first hook loads the rules when a session starts. The second hook is for Claude Code: it lets Claude Code read the files of the plugin and write the notebook. Codex does not need it. Then type `$duck:duck` to see the menu.
 
-- **Update**: `codex plugin marketplace upgrade ducktor`, then `codex plugin add duck@ducktor`. If a hook changed, trust it again in `/hooks`. Version 0.2.0 changed the commands of the two hooks. After you update to 0.2.0, trust the two hooks again.
+- **Update**: `codex plugin marketplace upgrade ducktor`, then `codex plugin add duck@ducktor`. If a hook changed, trust it again in `/hooks`. Version 0.2.0 changed the commands of the two hooks. After you update to 0.2.0, trust the two hooks again. Version 0.2.5 raised the length limit of the session-start hook to 5,000 tokens. After you update to 0.2.5, trust this hook again.
 - **Remove**: `codex plugin remove duck@ducktor` and `codex plugin marketplace remove ducktor`.
 - **Try a local copy that you changed**: `codex plugin marketplace add <path to this repository>`, then `codex plugin add duck@ducktor`. Codex copies the full folder into its cache. After each change, run `add` again.
 

@@ -31,7 +31,7 @@ codex plugin add duck@ducktor
 
 然后开 Codex，在 `/hooks` 里信任 Ducktor 的两条 hook（第一条在开会话时加载规则；第二条是给 Claude Code 放行读插件文件、写笔记用的，Codex 用不上），敲 `$duck:duck` 看菜单。
 
-- **更新**：`codex plugin marketplace upgrade ducktor`，再 `codex plugin add duck@ducktor`；hook 有改动时要在 `/hooks` 里重新信任。0.2.0 改了两条 hook 的命令，更新到 0.2.0 以后两条都要重新信任。
+- **更新**：`codex plugin marketplace upgrade ducktor`，再 `codex plugin add duck@ducktor`；hook 有改动时要在 `/hooks` 里重新信任。0.2.0 改了两条 hook 的命令，更新到 0.2.0 以后两条都要重新信任。0.2.5 把开场那条 hook 注入的长度上限调高到 5,000 token，更新到 0.2.5 以后要重新信任这一条。
 - **卸载**：`codex plugin remove duck@ducktor`，`codex plugin marketplace remove ducktor`。
 - **本地试改过的版本**：`codex plugin marketplace add <本仓库路径>`，再 `codex plugin add duck@ducktor`。Codex 会把整个目录拷进缓存，改了要重新 add。
 

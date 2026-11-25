@@ -226,6 +226,17 @@ test('the injected text stays well under host limits', () => {
   }
 });
 
+test('Codex gets the whole injection: the session-start handler raises its context limit', () => {
+  // Codex 0.172.0 gives the model about 2,500 tokens of each hook output and cuts the middle of
+  // the rest (11-25, issue #1: the 0.2.4 injection was 3,639 to 3,715 tokens, and the middle of
+  // core.md was cut). additionalContextLimit raises that threshold for this handler; Claude Code
+  // ignores the field. Measured on 11-25: 3,644 tokens for a 5,797-character injection, about
+  // 0.63 tokens per character, so the 7,100-character cap above is about 4,500 tokens.
+  const handler = HOOKS.SessionStart[0].hooks[0];
+  assert.ok(Number.isInteger(handler.additionalContextLimit), 'additionalContextLimit is set');
+  assert.ok(handler.additionalContextLimit >= Math.ceil(7100 * 0.63), `${handler.additionalContextLimit} tokens`);
+});
+
 test('SessionStart hook: Claude Code environment', () => {
   const dir = project({ '.duck/config.md': '开关：quiet\n' });
   const run = runHook('SessionStart', { CLAUDE_PLUGIN_ROOT: ROOT }, JSON.stringify({ cwd: dir, source: 'startup' }));

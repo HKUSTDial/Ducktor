@@ -2,6 +2,17 @@
 
 每一版对用户有什么变化，更新以后要做什么。最新的在最上面。
 
+## 0.2.5（2026-11-25）
+
+这一版只修 Codex 里的一个问题（issue #1 排查时查出）。Codex 0.172.0 默认只把每条 hook 输出的约 2,500 token 交给模型，多出的部分另存成文件，模型只看到开头和结尾。0.2.4 开场注入的常驻规则约 3,600 到 3,700 token（随 config.md 和插件路径变），中间一段被截掉：「每次都照做」的最后几条（这类我懂了、回复写短、新会话、工具报错），「怎么讲」整节，以及「平时这样做」的第 1 条（先问）和第 2 条（讲为什么）的主体。开启了 Ducktor 的项目里，不敲命令的轮次因此少了这几条规则；敲命令的那一轮，命令文件自带讲法和收尾步骤，基本不受影响。这一版把开场那条 hook 注入的长度上限调高到 5,000 token（`additionalContextLimit: 5000`），Codex 把整段常驻规则交给模型。Claude Code 不认这个字段，照常注入（在 2.1.332 上试过）。
+
+另外，INSTALL.md 常见问题改写了「Codex 里 AI 写不了 `.duck/` 下的文件」一条：Codex 改文件时只报 `Failed to write file`，不带原因；让 AI 跑一次 `touch .duck/reports/probe.txt`，按报错区分软链接、权限和沙箱三种情况。
+
+更新以后要做的：
+
+- Claude Code：`claude plugin marketplace update ducktor`，再 `claude plugin update duck@ducktor`，然后开新会话。
+- Codex：`codex plugin marketplace upgrade ducktor`，再 `codex plugin add duck@ducktor`，然后在 `/hooks` 里重新信任开场那条 hook（它的定义改了），再开新会话。不重新信任，这条 hook 不跑，开启了的项目也没有常驻规则。
+
 ## 0.2.4（2026-11-20）
 
 这一版加了一道改稿前的检查。0.2.3 的已知问题里有一条：你让 AI 改方案时，它有时在你定之前把研究决定写进稿子。规则里写了先问，模型读到了，改稿时还是会选别的做法。这一版在 AI 改稿的那一刻，由插件再提醒它一次。常驻规则（rules/core.md）改了三句：你要改稿时，AI 照要求改完，只有写着没定决定的句子照原稿留；第四、五个候选的测试里，没有再出现一处不改、只列问题。另外修了一处语言问题：写英文的同学第一句只敲 `/duck on` 时，回复和新建的设定文件是中文。

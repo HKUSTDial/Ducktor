@@ -81,7 +81,7 @@ Codex 的沙箱默认能读整个文件系统，不需要这条；它的工具�
 - 记录：第一次拒绝时，在 `$CLAUDE_PLUGIN_DATA/checkpoint/` 下用 O_EXCL、O_NOFOLLOW 建一个以「会话 id--这一轮的 id」命名的文件（宿主没给 `CLAUDE_PLUGIN_DATA` 时用 `$XDG_STATE_HOME/ducktor/checkpoint/`，再没有就用 `~/.local/state/ducktor/checkpoint/`）。文件已经在时，只有同一批的修改再拒一次（见下一条），这一轮别的修改放行。目录不归当前用户，或者同组和其他用户对它有任何权限时，放行。开新会话时删掉 7 天前的记录。
 - 同一批：Claude Code 一条消息里可以发出几处修改，它们执行时 AI 还没读到第一次拒绝的提醒（11-09 的探针：这一批跑完以后，会话记录里才有被拒的那次调用）。所以第一次拒绝以后，会话记录（hook 输入里的 `transcript_path`，读最后 8 MB）里还没有被拒那次调用的 id 时，这一轮的文本稿修改也拒绝一次。第一处以外最多再拒 8 处；第一次拒绝 2 分钟以后，不再算同一批。每再拒一处，在记录旁边建一个以「记录名.b调用 id」命名的空文件，用来数这一批拒了几处，开新会话时也删掉 7 天前的。11-09 的探针跑在无界面模式（`claude -p`）。交互界面里跑的一遍，一条消息里的 3 处修改只拦下前 2 处，第 3 处在 AI 读到提醒以前放行，原因未查明（`docs/testing.md`「学生看到的拒绝」一节）。
 - 出错就放行：读不到 config、建不了记录、会话记录读不了，这一次都放行，hook 不输出任何东西。
-- Codex：`apply_patch` 只在环境变量 `DUCK_CODEX_CHECKPOINT=1` 时进检查，探针和单元测试用它打开。0.2.4 的设计要 Codex 探针全部通过才打开；hooks 文件的匹配里现在也没有 `apply_patch`。
+- Codex：`apply_patch` 只在环境变量 `DUCK_CODEX_CHECKPOINT=1` 时进检查，探针和单元测试用它打开。0.2.4 的设计要 Codex 探针全部通过才打开。hooks 文件 PreToolUse 的匹配里没有写 `apply_patch`，但按 Codex 的 hooks 文档，`Write|Edit` 也匹配 `apply_patch`（输入里的 tool_name 仍是 `apply_patch`），所以 Codex 会把它交给这条 hook；没有这个环境变量时，`bin/duck.js` 不处理它，不输出任何东西（11-25 在 Codex 0.172.0 上开着 hook 写 `.duck/`，写入正常）。
 - 测试日志：`checkpoint/` 下有一个叫 `LOG` 的文件时，每次判断在 `log.txt` 里记一行（宿主、会话、这一轮、工具、是不是子代理、deny 或 allow、是不是同一批、时间、插件根目录下 BUILD 文件的内容）。平时没有 `LOG`，不记。
 - DeepSeek-Ducktor 在 dsh 执行改稿工具以前做同样的判断，调同一份 `bin/duck.js` 里的函数和提醒；同一批按 dsh 的「步」认，记录放在内存里。
 
